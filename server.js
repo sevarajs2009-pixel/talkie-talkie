@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -8,7 +9,11 @@ const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const { getAuth } = require('firebase-admin/auth');
 
-const serviceAccount = require('./talkietalkie-a9a53-firebase-adminsdk-fbsvc-087a2a1974..json');
+const serviceAccount = {
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+  privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+};
 
 initializeApp({
   credential: cert(serviceAccount)
@@ -17,12 +22,14 @@ initializeApp({
 const firestore = getFirestore();
 const firebaseAuth = getAuth();
 
+
+
 const app = express();
 
 const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(__dirname));
 
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ noServer: true });
@@ -664,10 +671,11 @@ wss.on('connection', (ws) => {
     }
   });
 });
-
 app.get('/room.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'room.html'));
 });
+
+
 
 server.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
