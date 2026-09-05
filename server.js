@@ -14,11 +14,21 @@ const privateKey = process.env.FIREBASE_PRIVATE_KEY
   .replace(/\\n/g, '\n')
   .trim();
 
-if (!process.env.FIREBASE_PROJECT_ID) {
+
+const firebaseProjectId = process.env.FIREBASE_PROJECT_ID
+  ?.replace(/^"|"$/g, '')
+  .trim();
+
+const firebaseClientEmail = process.env.FIREBASE_CLIENT_EMAIL
+  ?.replace(/^"|"$/g, '')
+  .trim();
+
+  
+if (!firebaseProjectId) {
   throw new Error("FIREBASE_PROJECT_ID is missing");
 }
 
-if (!process.env.FIREBASE_CLIENT_EMAIL) {
+if (!firebaseClientEmail) {
   throw new Error("FIREBASE_CLIENT_EMAIL is missing");
 }
 
@@ -27,8 +37,8 @@ if (!privateKey) {
 }
 
 const serviceAccount = {
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+  projectId: firebaseProjectId,
+  clientEmail: firebaseClientEmail,
   privateKey
 };
 
