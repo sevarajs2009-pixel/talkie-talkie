@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Login - Talkie Talkie</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&amp;family=Manrope:wght@600;700&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-container": "#dae2fd",
+                        "on-error": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary-container": "#eeefff",
+                        "surface-container": "#eceef0",
+                        "surface-container-low": "#f2f4f6",
+                        "on-surface-variant": "#434655",
+                        "surface-tint": "#0053db",
+                        "primary": "#004ac6",
+                        "error-container": "#ffdad6",
+                        "inverse-surface": "#2d3133",
+                        "inverse-primary": "#b4c5ff",
+                        "surface-container-highest": "#e0e3e5",
+                        "secondary-fixed": "#dae2fd",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "surface-variant": "#e0e3e5",
+                        "secondary": "#565e74",
+                        "tertiary-fixed": "#d3e4fe",
+                        "tertiary": "#46566c",
+                        "on-secondary-fixed": "#131b2e",
+                        "on-primary": "#ffffff",
+                        "on-tertiary-container": "#e9f0ff",
+                        "on-secondary-fixed-variant": "#3f465c",
+                        "on-secondary-container": "#5c647a",
+                        "surface": "#f7f9fb",
+                        "on-tertiary-fixed-variant": "#38485d",
+                        "surface-dim": "#d8dadc",
+                        "tertiary-container": "#5e6e85",
+                        "primary-fixed": "#dbe1ff",
+                        "outline": "#737686",
+                        "outline-variant": "#c3c6d7",
+                        "on-error-container": "#93000a",
+                        "secondary-fixed-dim": "#bec6e0",
+                        "on-secondary": "#ffffff",
+                        "inverse-on-surface": "#eff1f3",
+                        "on-surface": "#191c1e",
+                        "tertiary-fixed-dim": "#b7c8e1",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "surface-container-high": "#e6e8ea",
+                        "primary-container": "#2563eb",
+                        "surface-bright": "#f7f9fb",
+                        "on-tertiary": "#ffffff",
+                        "on-tertiary-fixed": "#0b1c30",
+                        "on-background": "#191c1e",
+                        "on-primary-fixed": "#00174b",
+                        "background": "#f7f9fb",
+                        "error": "#ba1a1a"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-gap-md": "1.25rem",
+                        "stack-gap-lg": "2rem",
+                        "input-padding": "0.875rem 1rem",
+                        "container-margin": "1.5rem",
+                        "stack-gap-sm": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "body-lg": ["Inter"],
+                        "headline-lg": ["Manrope"],
+                        "headline-md": ["Manrope"],
+                        "body-sm": ["Inter"],
+                        "headline-lg-mobile": ["Manrope"],
+                        "button-text": ["Inter"],
+                        "label-caps": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg": ["30px", { "lineHeight": "38px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "button-text": ["15px", { "lineHeight": "20px", "fontWeight": "600" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .input-glow:focus-within {
+            box-shadow: 0 0 8px 0 rgba(0, 74, 198, 0.1);
+        }
+
+        /* Responsive Media Queries */
+        @media (max-width: 640px) {
+            header div {
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+
+            main {
+                padding-left: 1rem;
+                padding-right: 1rem;
+                padding-top: 1.5rem;
+            }
+
+            .login-card {
+                padding: 1.25rem;
+            }
+        }
+
+        @media (min-width: 768px) {
+            main {
+                justify-content: center;
+                padding-top: 2rem;
+                padding-bottom: 2rem;
+            }
+
+            .login-card {
+                padding: 2rem;
+                border-radius: 1rem;
+            }
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col font-body-lg">
+<header class="w-full top-0 bg-surface dark:bg-surface-dim flat no shadows z-40 relative">
+<div class="flex items-center justify-between px-6 py-4 w-full h-[64px]">
+<button onclick="window.history.back()" aria-label="Go back" class="text-primary dark:text-primary-fixed-dim hover:bg-surface-container-high transition-colors active:scale-95 transition-transform p-2 rounded-full -ml-2 flex items-center justify-center focus:outline-none">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md-mobile dark:text-on-surface text-center flex-1 pr-[40px]">Talkie Talkie</h1>
+</div>
+</header>
+
+<main class="flex-1 px-container-margin py-stack-gap-lg flex flex-col items-center w-full max-w-md mx-auto relative z-10">
+<div class="flex items-center justify-center w-12 h-12 rounded-full bg-surface-container-low mb-6 border border-outline-variant shadow-sm">
+<span class="material-symbols-outlined text-primary text-2xl" style="font-variation-settings: 'FILL' 1;">shield_lock</span>
+</div>
+
+<div class="text-center w-full mb-8">
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface mb-2"></h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Sign in to your account to continue</p>
+</div>
+
+<div class="w-full bg-surface-container-lowest rounded-xl p-6 border border-surface-variant shadow-sm login-card">
+<!-- Password Portal Form -->
+<form id="login-form" class="space-y-stack-gap-md">
+<div class="flex flex-col gap-1 w-full">
+<label class="font-label-caps text-label-caps text-on-surface-variant pl-1" for="username-input">Username Email </label>
+<div class="relative input-glow rounded-lg">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant z-10 pointer-events-none">person</span>
+<input class="w-full bg-[#F1F5F9] focus:bg-white text-on-surface border border-transparent focus:border-outline-variant rounded-lg p-input-padding pl-11 transition-colors font-body-lg text-body-lg outline-none placeholder:text-outline" id="username-input" placeholder="Username" type="text" required>
+</div>
+</div>
+<div class="flex flex-col gap-1 w-full">
+<label class="font-label-caps text-label-caps text-on-surface-variant pl-1" for="password-input">Password</label>
+<div class="relative input-glow rounded-lg">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant z-10 pointer-events-none">lock</span>
+<input class="w-full bg-[#F1F5F9] focus:bg-white text-on-surface border border-transparent focus:border-outline-variant rounded-lg p-input-padding pl-11 pr-11 transition-colors font-body-lg text-body-lg outline-none placeholder:text-outline" id="password-input" placeholder="••••••••" type="password" required>
+<button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors focus:outline-none" onclick="togglePassword()">
+<span class="material-symbols-outlined" id="password-toggle-icon">visibility</span>
+</button>
+</div>
+</div>
+
+<button type="submit" class="w-full bg-primary text-on-primary font-button-text text-button-text h-[52px] rounded-lg mt-stack-gap-lg flex items-center justify-center gap-2 hover:bg-primary-container active:scale-[0.98] transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2" id="submit-btn">
+    <span>Sign In</span>
+    <span class="material-symbols-outlined text-sm" id="submit-icon">login</span>
+</button>
+</form>
+</div>
+
+<div class="mt-8 flex flex-col items-center gap-stack-gap-sm w-full">
+<a href="/signup.html" class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors bg-transparent border-none p-2 rounded focus:outline-none">
+    Don't have an account? <span class="font-semibold text-primary">Sign up</span>
+</a>
+<button type="button" class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors bg-transparent border-none p-2 rounded focus:outline-none">
+    Problem signing in?
+</button>
+</div>
+</main>
+
+<script>
+        function togglePassword() {
+            const passwordInput = document.getElementById('password-input');
+            const toggleIcon = document.getElementById('password-toggle-icon');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleIcon.textContent = 'visibility_off';
+            } else {
+                passwordInput.type = 'password';
+                toggleIcon.textContent = 'visibility';
+            }
+        }
+
+        // Login Handler with Session Token Handling
+        
+    </script>
+    <script type="module" src="./login.js"></script>
+</body>
+</html>
+```[cite: 11]

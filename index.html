@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Sign Up - Talkie Talkie</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&amp;family=Manrope:wght@600;700&amp;display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "background": "#f7f9fb",
+                    "inverse-on-surface": "#eff1f3",
+                    "on-primary-container": "#eeefff",
+                    "tertiary-fixed": "#d3e4fe",
+                    "surface-container-lowest": "#ffffff",
+                    "outline": "#737686",
+                    "tertiary-container": "#5e6e85",
+                    "on-error-container": "#93000a",
+                    "primary-fixed-dim": "#b4c5ff",
+                    "on-primary-fixed": "#00174b",
+                    "inverse-primary": "#b4c5ff",
+                    "on-surface": "#191c1e",
+                    "on-primary-fixed-variant": "#003ea8",
+                    "secondary-fixed-dim": "#bec6e0",
+                    "secondary-fixed": "#dae2fd",
+                    "primary-fixed": "#dbe1ff",
+                    "error": "#ba1a1a",
+                    "surface-dim": "#d8dadc",
+                    "tertiary": "#46566c",
+                    "surface-container-highest": "#e0e3e5",
+                    "secondary-container": "#dae2fd",
+                    "tertiary-fixed-dim": "#b7c8e1",
+                    "on-secondary-container": "#5c647a",
+                    "on-surface-variant": "#434655",
+                    "surface-variant": "#e0e3e5",
+                    "on-tertiary-fixed-variant": "#38485d",
+                    "inverse-surface": "#2d3133",
+                    "on-tertiary": "#ffffff",
+                    "error-container": "#ffdad6",
+                    "on-secondary-fixed": "#131b2e",
+                    "on-secondary": "#ffffff",
+                    "on-tertiary-fixed": "#0b1c30",
+                    "secondary": "#565e74",
+                    "surface": "#f7f9fb",
+                    "primary": "#004ac6",
+                    "on-primary": "#ffffff",
+                    "surface-bright": "#f7f9fb",
+                    "outline-variant": "#c3c6d7",
+                    "on-tertiary-container": "#e9f0ff",
+                    "on-secondary-fixed-variant": "#3f465c",
+                    "surface-container-low": "#f2f4f6",
+                    "surface-tint": "#0053db",
+                    "surface-container": "#eceef0",
+                    "on-background": "#191c1e",
+                    "primary-container": "#2563eb",
+                    "surface-container-high": "#e6e8ea",
+                    "on-error": "#ffffff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "stack-gap-sm": "0.75rem",
+                    "stack-gap-md": "1.25rem",
+                    "input-padding": "0.875rem 1rem",
+                    "container-margin": "1.5rem",
+                    "stack-gap-lg": "2rem"
+            },
+            "fontFamily": {
+                    "button-text": ["Inter"],
+                    "body-sm": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "headline-lg": ["Manrope"],
+                    "headline-lg-mobile": ["Manrope"],
+                    "headline-md": ["Manrope"],
+                    "label-caps": ["Inter"]
+            },
+            "fontSize": {
+                    "button-text": ["15px", { "lineHeight": "20px", "fontWeight": "600" }],
+                    "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                    "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                    "headline-lg": ["30px", { "lineHeight": "38px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                    "headline-lg-mobile": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                    "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                    "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }]
+            }
+          },
+        }
+      }
+    </script>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col font-body-sm relative selection:bg-primary-container selection:text-on-primary-container">
+<header class="fixed top-0 w-full z-50 bg-background dark:bg-on-surface flex items-center justify-between px-container-margin h-16 shadow-none">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim text-2xl font-bold">shield</span>
+<span class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim">Talkie Talkie</span>
+</div>
+</header>
+
+<main class="flex-grow pt-24 pb-safe flex flex-col px-container-margin w-full max-w-md sm:max-w-lg md:max-w-xl mx-auto">
+<div class="mb-8 text-left md:text-center">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile md:text-headline-lg text-on-surface mb-2">Create Account</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Enter your details to get started.</p>
+</div>
+<form id="signup-form" class="flex flex-col gap-stack-gap-md w-full">
+
+<!-- Full Name -->
+<div class="relative w-full group">
+<label class="block font-label-caps text-label-caps text-on-surface-variant mb-1 ml-1 uppercase tracking-wider" for="fullName">Full Name</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-4 text-outline group-focus-within:text-primary transition-colors duration-200">person</span>
+<input class="w-full bg-surface-container-low focus:bg-surface-container-lowest text-on-surface font-body-lg text-body-lg rounded-lg border border-surface-variant focus:border-primary focus:ring-0 focus:shadow-[0_0_8px_rgba(0,74,198,0.1)] outline-none py-3.5 pl-12 pr-4 transition-all duration-200" id="fullName" name="fullName" placeholder="John Doe" type="text" required>
+</div>
+</div>
+
+<!-- Username -->
+<div class="relative w-full group">
+<label class="block font-label-caps text-label-caps text-on-surface-variant mb-1 ml-1 uppercase tracking-wider" for="username">Username</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-4 text-outline group-focus-within:text-primary transition-colors duration-200">account_circle</span>
+<input class="w-full bg-surface-container-low focus:bg-surface-container-lowest text-on-surface font-body-lg text-body-lg rounded-lg border border-surface-variant focus:border-primary focus:ring-0 focus:shadow-[0_0_8px_rgba(0,74,198,0.1)] outline-none py-3.5 pl-12 pr-36 transition-all duration-200" id="username" name="username" placeholder="johndoe123" type="text" required>
+<div class="absolute right-3 flex items-center gap-2">
+  <button class="text-primary font-button-text text-label-caps hover:text-primary-fixed-variant focus:outline-none transition-colors duration-200 px-2 py-1 bg-surface-container rounded" type="button" onclick="checkUsernameAvailability()">
+    Check
+  </button>
+  <button class="text-primary font-button-text text-label-caps hover:text-primary-fixed-variant focus:outline-none transition-colors duration-200 flex items-center gap-0.5" type="button" onclick="generateUniqueUsername()">
+    <span class="material-symbols-outlined text-sm">auto_awesome</span> Suggest
+  </button>
+</div>
+</div>
+<div id="username-status" class="flex items-center gap-1 mt-1 ml-1 text-on-surface-variant font-body-sm">
+</div>
+</div>
+
+<!-- Email Address -->
+<div class="relative w-full group">
+<label class="block font-label-caps text-label-caps text-on-surface-variant mb-1 ml-1 uppercase tracking-wider" for="email">Email Address</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-4 text-outline group-focus-within:text-primary transition-colors duration-200">mail</span>
+<input class="w-full bg-surface-container-low focus:bg-surface-container-lowest text-on-surface font-body-lg text-body-lg rounded-lg border border-surface-variant focus:border-primary focus:ring-0 focus:shadow-[0_0_8px_rgba(0,74,198,0.1)] outline-none py-3.5 pl-12 pr-4 transition-all duration-200" id="email" name="email" placeholder="john@example.com" type="email" required>
+</div>
+</div>
+
+<!-- Age & Gender Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  <!-- Age Input -->
+  <div class="relative w-full group">
+    <label class="block font-label-caps text-label-caps text-on-surface-variant mb-1 ml-1 uppercase tracking-wider" for="age">Age</label>
+    <div class="relative flex items-center">
+      <span class="material-symbols-outlined absolute left-4 text-outline group-focus-within:text-primary transition-colors duration-200">cake</span>
+      <input class="w-full bg-surface-container-low focus:bg-surface-container-lowest text-on-surface font-body-lg text-body-lg rounded-lg border border-surface-variant focus:border-primary focus:ring-0 focus:shadow-[0_0_8px_rgba(0,74,198,0.1)] outline-none py-3.5 pl-12 pr-4 transition-all duration-200" id="age" name="age" placeholder="18" type="number" min="13" max="120" required>
+    </div>
+  </div>
+
+  <!-- Gender Select -->
+  <div class="relative w-full group">
+    <label class="block font-label-caps text-label-caps text-on-surface-variant mb-1 ml-1 uppercase tracking-wider" for="gender">Gender</label>
+    <div class="relative flex items-center">
+      <span class="material-symbols-outlined absolute left-4 text-outline group-focus-within:text-primary transition-colors duration-200">wc</span>
+      <select class="w-full bg-surface-container-low focus:bg-surface-container-lowest text-on-surface font-body-lg text-body-lg rounded-lg border border-surface-variant focus:border-primary focus:ring-0 focus:shadow-[0_0_8px_rgba(0,74,198,0.1)] outline-none py-3.5 pl-12 pr-4 transition-all duration-200 appearance-none cursor-pointer" id="gender" name="gender" required>
+        <option value="" disabled selected>Select</option>
+        <option value="male">Male</option>
+        <option value="female">Female</option>
+        <option value="non-binary">Non-Binary</option>
+        <option value="other">Prefer not to say</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- Country Select -->
+<div class="relative w-full group">
+<label class="block font-label-caps text-label-caps text-on-surface-variant mb-1 ml-1 uppercase tracking-wider" for="country">Country</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-4 text-outline group-focus-within:text-primary transition-colors duration-200">public</span>
+<select class="w-full bg-surface-container-low focus:bg-surface-container-lowest text-on-surface font-body-lg text-body-lg rounded-lg border border-surface-variant focus:border-primary focus:ring-0 focus:shadow-[0_0_8px_rgba(0,74,198,0.1)] outline-none py-3.5 pl-12 pr-4 transition-all duration-200 appearance-none cursor-pointer" id="country" name="country" required>
+  <option value="" disabled selected>Select your country</option>
+  <option value="Afghanistan">Afghanistan</option>
+  <option value="Albania">Albania</option>
+  <option value="Algeria">Algeria</option>
+  <option value="Andorra">Andorra</option>
+  <option value="Angola">Angola</option>
+  <option value="Argentina">Argentina</option>
+  <option value="Armenia">Armenia</option>
+  <option value="Australia">Australia</option>
+  <option value="Austria">Austria</option>
+  <option value="Azerbaijan">Azerbaijan</option>
+  <option value="Bahamas">Bahamas</option>
+  <option value="Bahrain">Bahrain</option>
+  <option value="Bangladesh">Bangladesh</option>
+  <option value="Barbados">Barbados</option>
+  <option value="Belarus">Belarus</option>
+  <option value="Belgium">Belgium</option>
+  <option value="Belize">Belize</option>
+  <option value="Benin">Benin</option>
+  <option value="Bhutan">Bhutan</option>
+  <option value="Bolivia">Bolivia</option>
+  <option value="Brazil">Brazil</option>
+  <option value="Brunei">Brunei</option>
+  <option value="Bulgaria">Bulgaria</option>
+  <option value="Cambodia">Cambodia</option>
+  <option value="Cameroon">Cameroon</option>
+  <option value="Canada">Canada</option>
+  <option value="Chile">Chile</option>
+  <option value="China">China</option>
+  <option value="Colombia">Colombia</option>
+  <option value="Costa Rica">Costa Rica</option>
+  <option value="Croatia">Croatia</option>
+  <option value="Cuba">Cuba</option>
+  <option value="Cyprus">Cyprus</option>
+  <option value="Czech Republic">Czech Republic</option>
+  <option value="Denmark">Denmark</option>
+  <option value="Ecuador">Ecuador</option>
+  <option value="Egypt">Egypt</option>
+  <option value="Estonia">Estonia</option>
+  <option value="Ethiopia">Ethiopia</option>
+  <option value="Fiji">Fiji</option>
+  <option value="Finland">Finland</option>
+  <option value="France">France</option>
+  <option value="Georgia">Georgia</option>
+  <option value="Germany">Germany</option>
+  <option value="Ghana">Ghana</option>
+  <option value="Greece">Greece</option>
+  <option value="Guatemala">Guatemala</option>
+  <option value="Haiti">Haiti</option>
+  <option value="Honduras">Honduras</option>
+  <option value="Hungary">Hungary</option>
+  <option value="Iceland">Iceland</option>
+  <option value="India">India</option>
+  <option value="Indonesia">Indonesia</option>
+  <option value="Iran">Iran</option>
+  <option value="Iraq">Iraq</option>
+  <option value="Ireland">Ireland</option>
+  <option value="Israel">Israel</option>
+  <option value="Italy">Italy</option>
+  <option value="Jamaica">Jamaica</option>
+  <option value="Japan">Japan</option>
+  <option value="Jordan">Jordan</option>
+  <option value="Kazakhstan">Kazakhstan</option>
+  <option value="Kenya">Kenya</option>
+  <option value="Kuwait">Kuwait</option>
+  <option value="Laos">Laos</option>
+  <option value="Latvia">Latvia</option>
+  <option value="Lebanon">Lebanon</option>
+  <option value="Libya">Libya</option>
+  <option value="Lithuania">Lithuania</option>
+  <option value="Luxembourg">Luxembourg</option>
+  <option value="Malaysia">Malaysia</option>
+  <option value="Maldives">Maldives</option>
+  <option value="Mexico">Mexico</option>
+  <option value="Monaco">Monaco</option>
+  <option value="Mongolia">Mongolia</option>
+  <option value="Morocco">Morocco</option>
+  <option value="Nepal">Nepal</option>
+  <option value="Netherlands">Netherlands</option>
+  <option value="New Zealand">New Zealand</option>
+  <option value="Nigeria">Nigeria</option>
+  <option value="Norway">Norway</option>
+  <option value="Oman">Oman</option>
+  <option value="Pakistan">Pakistan</option>
+  <option value="Panama">Panama</option>
+  <option value="Paraguay">Paraguay</option>
+  <option value="Peru">Peru</option>
+  <option value="Philippines">Philippines</option>
+  <option value="Poland">Poland</option>
+  <option value="Portugal">Portugal</option>
+  <option value="Qatar">Qatar</option>
+  <option value="Romania">Romania</option>
+  <option value="Russia">Russia</option>
+  <option value="Saudi Arabia">Saudi Arabia</option>
+  <option value="Senegal">Senegal</option>
+  <option value="Serbia">Serbia</option>
+  <option value="Singapore">Singapore</option>
+  <option value="Slovakia">Slovakia</option>
+  <option value="Slovenia">Slovenia</option>
+  <option value="South Africa">South Africa</option>
+  <option value="South Korea">South Korea</option>
+  <option value="Spain">Spain</option>
+  <option value="Sri Lanka">Sri Lanka</option>
+  <option value="Sweden">Sweden</option>
+  <option value="Switzerland">Switzerland</option>
+  <option value="Thailand">Thailand</option>
+  <option value="Turkey">Turkey</option>
+  <option value="Ukraine">Ukraine</option>
+  <option value="United Arab Emirates">United Arab Emirates</option>
+  <option value="United Kingdom">United Kingdom</option>
+  <option value="United States">United States</option>
+  <option value="Uruguay">Uruguay</option>
+  <option value="Uzbekistan">Uzbekistan</option>
+  <option value="Venezuela">Venezuela</option>
+  <option value="Vietnam">Vietnam</option>
+  <option value="Yemen">Yemen</option>
+  <option value="Zambia">Zambia</option>
+  <option value="Zimbabwe">Zimbabwe</option>
+</select>
+</div>
+</div>
+
+<!-- Password -->
+<div class="relative w-full group">
+<label class="block font-label-caps text-label-caps text-on-surface-variant mb-1 ml-1 uppercase tracking-wider" for="password">Password</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-4 text-outline group-focus-within:text-primary transition-colors duration-200">lock</span>
+<input class="w-full bg-surface-container-low focus:bg-surface-container-lowest text-on-surface font-body-lg text-body-lg rounded-lg border border-surface-variant focus:border-primary focus:ring-0 focus:shadow-[0_0_8px_rgba(0,74,198,0.1)] outline-none py-3.5 pl-12 pr-12 transition-all duration-200" id="password" name="password" placeholder="••••••••" type="password" required minlength="6">
+<button id="toggle-password" aria-label="Toggle password visibility" class="absolute right-4 text-outline hover:text-on-surface-variant focus:outline-none transition-colors duration-200" type="button">
+<span class="material-symbols-outlined">visibility_off</span>
+</button>
+</div>
+</div>
+
+<button class="w-full mt-4 bg-primary text-on-primary font-button-text text-button-text rounded-lg py-4 flex items-center justify-center hover:opacity-90 active:scale-[0.98] transition-all duration-200 shadow-[0_4px_12px_rgba(0,74,198,0.15)] h-[52px]" type="submit">
+    Sign Up
+</button>
+
+<div class="relative flex items-center py-4">
+  <div class="flex-grow border-t border-surface-variant"></div>
+  <span class="flex-shrink mx-4 text-label-caps text-on-surface-variant uppercase tracking-wider">Or sign up with</span>
+  <div class="flex-grow border-t border-surface-variant"></div>
+</div>
+
+<div class="flex flex-col sm:flex-row gap-3">
+  <button type="button" class="w-full bg-surface-container-low text-on-surface font-button-text text-button-text rounded-lg py-3.5 flex items-center justify-center gap-3 border border-surface-variant hover:bg-surface-container-highest transition-all duration-200">
+    <svg class="w-5 h-5" viewBox="0 0 24 24">
+      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"></path>
+      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"></path>
+      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"></path>
+      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"></path>
+    </svg>
+    Continue with Google
+  </button>
+  <button type="button" class="w-full bg-surface-container-low text-on-surface font-button-text text-button-text rounded-lg py-3.5 flex items-center justify-center gap-3 border border-surface-variant hover:bg-surface-container-highest transition-all duration-200">
+    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M17.05 20.28c-.98.95-2.05 1.72-3.21 1.72-1.13 0-1.5-.69-2.84-.69-1.34 0-1.75.67-2.84.67-1.13 0-2.13-.72-3.16-1.72-2.11-2.04-3.72-5.76-3.72-8.58 0-4.28 2.78-6.54 5.43-6.54 1.39 0 2.58.86 3.41.86.81 0 2.13-.91 3.69-.91 1.3 0 4.14.47 5.69 2.74-3.12 1.83-2.61 5.72.5 6.97-1.13 2.61-2.11 4.53-2.95 5.38zM12.03 5.07c0-2.31 1.91-4.18 4.24-4.18.03 0 .06 0 .09.01-.03 2.31-1.91 4.18-4.24 4.18-.03 0-.06 0-.09-.01z"></path>
+    </svg>
+    Continue with Apple
+  </button>
+</div>
+</form>
+
+<div class="mt-8 text-center">
+<a class="font-button-text text-button-text text-primary hover:text-primary-fixed-variant transition-colors duration-200" href="/login.html">
+    Already have an account? Sign in
+</a>
+</div>
+</main>
+
+<script>
+  // Password Visibility Toggle
+  const toggleBtn = document.getElementById('toggle-password');
+  const passwordInput = document.getElementById('password');
+
+  if (toggleBtn && passwordInput) {
+    toggleBtn.addEventListener('click', () => {
+      const isPassword = passwordInput.getAttribute('type') === 'password';
+      passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
+      const icon = toggleBtn.querySelector('.material-symbols-outlined');
+      if (icon) {
+        icon.textContent = isPassword ? 'visibility' : 'visibility_off';
+      }
+    });
+  }
+
+  // Check Username Availability Function
+  function checkUsernameAvailability() {
+    const usernameInput = document.getElementById('username').value.trim();
+    const statusDiv = document.getElementById('username-status');
+
+    if (!usernameInput) {
+      statusDiv.innerHTML = `<span class="material-symbols-outlined text-[16px] text-error">error</span><span class="text-error">Please enter a username first.</span>`;
+      return;
+    }
+
+    // Checking if the entered username is "Kumar" (case-insensitive)
+    if (usernameInput.toLowerCase() === 'kumar') {
+      statusDiv.innerHTML = `<span class="material-symbols-outlined text-[16px] text-error">error</span><span class="text-error">This is already taken. Try a different one or click Suggest.</span>`;
+    } else {
+      statusDiv.innerHTML = `<span class="material-symbols-outlined text-[16px] text-[#2e7d32]">check_circle</span><span class="text-[#2e7d32]">Username is available!</span>`;
+    }
+  }
+
+  // Generate Unique Username Function
+  function generateUniqueUsername() {
+    const adjectives = ['Swift', 'Cosmic', 'Brave', 'Neon', 'Bold', 'Silent', 'Lunar', 'Alpha', 'Epic', 'Nova'];
+    const nouns = ['Talker', 'Speaker', 'Vibe', 'Echo', 'Voice', 'Wave', 'Pulse', 'Node', 'Chatter', 'Link'];
+    const randomAdj = adjectives[Math.floor(Math.random() * adjectives.length)];
+    const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
+    const randomNum = Math.floor(100 + Math.random() * 900);
+    const uniqueName = `${randomAdj}${randomNoun}${randomNum}`;
+    document.getElementById('username').value = uniqueName;
+    
+    // Automatically clear or set success state when suggestion is clicked
+    document.getElementById('username-status').innerHTML = `<span class="material-symbols-outlined text-[16px] text-[#2e7d32]">check_circle</span><span class="text-[#2e7d32]">Username is available!</span>`;
+  }
+
+  // Handle Sign Up Submission
+ 
+</script>
+ <script type="module" src="./signup.js"></script>
+</body>
+</html>

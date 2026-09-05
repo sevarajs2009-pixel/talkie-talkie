@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>Talkie Talkie Room</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f6ff',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+            },
+            surface: {
+              base: '#0f172a',
+              card: '#1e293b',
+              border: '#334155',
+              hover: '#334155'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; transition: background 0.4s ease; }
+
+    .bg-pattern-grid {
+      background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+      background-size: 32px 32px;
+    }
+    .bg-pattern-radial {
+      background-image: 
+        radial-gradient(at 50% 0%, rgba(255, 255, 255, 0.08) 0px, transparent 60%),
+        radial-gradient(at 50% 100%, rgba(0, 0, 0, 0.3) 0px, transparent 60%);
+    }
+
+    .theme-emerald { background-color: #022c22; --accent-glow: rgba(16, 185, 129, 0.3); }
+    .theme-blue { background-color: #030712; --accent-glow: rgba(59, 130, 246, 0.3); }
+    .theme-purple { background-color: #1a0c2e; --accent-glow: rgba(168, 85, 247, 0.3); }
+    .theme-amber { background-color: #1f1202; --accent-glow: rgba(245, 158, 11, 0.3); }
+    .theme-rose { background-color: #27060f; --accent-glow: rgba(244, 63, 94, 0.3); }
+    .theme-cyber { background-color: #090d16; --accent-glow: rgba(6, 182, 212, 0.3); }
+
+    .icon-3d-wrapper { perspective: 1000px; }
+
+    .icon-3d-badge {
+      transform-style: preserve-3d;
+      animation: float-3d-badge 4s ease-in-out infinite alternate;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), inset 0 2px 4px rgba(255, 255, 255, 0.3);
+    }
+
+    @keyframes float-3d-badge {
+      0% { transform: rotateX(10deg) rotateY(-12deg) translateZ(0px); }
+      100% { transform: rotateX(-10deg) rotateY(12deg) translateZ(8px); }
+    }
+
+    .ptt-3d-button {
+      transform-style: preserve-3d;
+      animation: float-3d-ptt 5s ease-in-out infinite alternate;
+      box-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.7), inset 0 4px 8px rgba(255, 255, 255, 0.35), inset 0 -6px 12px rgba(0, 0, 0, 0.5);
+    }
+
+    @keyframes float-3d-ptt {
+      0% { transform: rotateX(8deg) rotateY(-8deg) translateZ(0px); }
+      50% { transform: rotateX(-6deg) rotateY(10deg) translateZ(12px); }
+      100% { transform: rotateX(10deg) rotateY(6deg) translateZ(4px); }
+    }
+
+    .ptt-3d-icon {
+      filter: drop-shadow(0 6px 8px rgba(0,0,0,0.6));
+      transform: translateZ(20px);
+    }
+    
+    .ptt-ring {
+      animation: float-3d-ptt 5s ease-in-out infinite alternate, pulse-ring 2s infinite cubic-bezier(0.66, 0, 0, 1);
+    }
+    @keyframes pulse-ring {
+      to { box-shadow: 0 0 0 28px transparent; }
+    }
+
+    .ptt-transmitting {
+      box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6) !important;
+      animation: pulse-ring-active 1.2s infinite cubic-bezier(0.66, 0, 0, 1) !important;
+    }
+    @keyframes pulse-ring-active {
+      to { box-shadow: 0 0 0 36px rgba(239, 68, 68, 0); }
+    }
+
+    @keyframes sos-shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-6px) rotate(-1deg); }
+      40% { transform: translateX(6px) rotate(1deg); }
+      60% { transform: translateX(-4px) rotate(-1deg); }
+      80% { transform: translateX(4px) rotate(1deg); }
+    }
+    .sos-active-danger {
+      background-color: rgba(225, 29, 72, 0.45) !important;
+      border-color: rgba(244, 63, 94, 0.9) !important;
+      animation: sos-shake 0.4s ease-in-out infinite !important;
+    }
+    
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
+
+    #map { height: 320px; width: 100%; border-radius: 1rem; }
+
+    @media (max-width: 640px) {
+      #pttButton { width: 9rem; height: 9rem; }
+      #ambient-glow { width: 11rem; height: 11rem; }
+      main { padding-left: 1rem; padding-right: 1rem; }
+    }
+
+    @media (min-width: 768px) {
+      #room-body {
+        border-radius: 1.5rem;
+        margin-top: 1.5rem;
+        margin-bottom: 1.5rem;
+        height: calc(100vh - 3rem);
+      }
+      #room-header {
+        border-top-left-radius: 1.5rem;
+        border-top-right-radius: 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body id="room-body" class="theme-emerald text-slate-100 min-h-screen flex flex-col relative md:max-w-md md:mx-auto shadow-2xl overflow-hidden selection:bg-brand-500/30">
+
+  <!-- Header Navigation -->
+  <header id="room-header" class="fixed top-0 w-full md:w-[28rem] z-40 bg-slate-950/70 backdrop-blur-xl border-b border-surface-border/60 flex justify-between items-center px-6 h-16 transition-all duration-500">
+    <div class="flex items-center gap-3">
+      <div class="icon-3d-wrapper">
+        <div id="room-type-icon-container" class="w-10 h-10 rounded-xl flex items-center justify-center icon-3d-badge transition-all duration-500 bg-gradient-to-br from-emerald-400 to-teal-700 text-white">
+          <span id="room-type-icon" class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">family_restroom</span>
+        </div>
+      </div>
+      <div>
+        <div class="flex items-center gap-1.5">
+          <h1 id="header-room-name" class="text-base font-bold text-white truncate max-w-[120px]">Talkie Talkie</h1>
+          <span id="header-room-type-badge" class="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border transition-all duration-500">FAMILY</span>
+        </div>
+        <p class="text-[11px] text-slate-400 flex items-center gap-1.5 font-medium mt-0.5">
+          <span id="security-dot" class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+          <span id="security-status-text">GPS Tracking Active</span>
+        </p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <button id="admin-room-settings-btn" onclick="toggleRoomSettingsModal()" title="Admin SOS Settings" class="w-9 h-9 hidden items-center justify-center rounded-xl bg-surface-card text-slate-300 hover:text-white hover:bg-surface-hover transition-all active:scale-95 border border-surface-border shadow-sm">
+        <span class="material-symbols-outlined text-[18px]">tune</span>
+      </button>
+      <button onclick="toggleThemePanel()" title="Customize Theme" class="w-9 h-9 flex items-center justify-center rounded-xl bg-surface-card text-slate-300 hover:text-white hover:bg-surface-hover transition-all active:scale-95 border border-surface-border shadow-sm">
+        <span class="material-symbols-outlined text-[18px]">palette</span>
+      </button>
+      <button onclick="leaveRoom()" title="Leave Room" class="w-9 h-9 flex items-center justify-center rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white transition-all active:scale-95 border border-rose-500/20">
+        <span class="material-symbols-outlined text-[18px]">logout</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Admin Room Settings Modal -->
+  <div id="room-settings-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="bg-surface-card border border-surface-border w-full max-w-xs rounded-3xl p-5 shadow-2xl flex flex-col gap-4 relative">
+      <div class="flex items-center justify-between pb-3 border-b border-surface-border/60">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-brand-500">tune</span>
+          <h3 class="text-sm font-bold text-white uppercase tracking-wider">SOS Alarm Mode</h3>
+        </div>
+        <button onclick="toggleRoomSettingsModal()" class="w-8 h-8 rounded-full bg-surface-hover flex items-center justify-center text-slate-300 hover:text-white">
+          <span class="material-symbols-outlined text-sm">close</span>
+        </button>
+      </div>
+
+      <div class="space-y-3">
+        <!-- 10-Second Timer -->
+        <label class="flex items-center gap-3 p-3 rounded-xl border border-surface-border bg-slate-900/60 cursor-pointer hover:border-brand-500 transition-all">
+          <input type="radio" name="sosModeRadio" value="10s" onchange="setSosMode('10s')" class="w-4 h-4 text-brand-500 focus:ring-0" checked>
+          <div>
+            <p class="text-xs font-bold text-white">10–Second Timer Active</p>
+            <p class="text-[10px] text-slate-400">SOS alarms automatically stop after 10 seconds.</p>
+          </div>
+        </label>
+
+        <!-- 1-Minute Timer -->
+        <label class="flex items-center gap-3 p-3 rounded-xl border border-surface-border bg-slate-900/60 cursor-pointer hover:border-brand-500 transition-all">
+          <input type="radio" name="sosModeRadio" value="1m" onchange="setSosMode('1m')" class="w-4 h-4 text-brand-500 focus:ring-0">
+          <div>
+            <p class="text-xs font-bold text-white">1–Minute Timer Active</p>
+            <p class="text-[10px] text-slate-400">SOS alarms automatically stop after 1 minute.</p>
+          </div>
+        </label>
+
+        <!-- Unlimited Timer -->
+        <label class="flex items-center gap-3 p-3 rounded-xl border border-surface-border bg-slate-900/60 cursor-pointer hover:border-brand-500 transition-all">
+          <input type="radio" name="sosModeRadio" value="unlimited" onchange="setSosMode('unlimited')" class="w-4 h-4 text-brand-500 focus:ring-0">
+          <div>
+            <p class="text-xs font-bold text-white">Unlimited Timer Active</p>
+            <p class="text-[10px] text-slate-400">SOS alarms remain active until manually turned off.</p>
+          </div>
+        </label>
+      </div>
+
+      <button onclick="toggleRoomSettingsModal()" class="w-full py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 font-bold text-xs text-white transition-all shadow-lg shadow-brand-500/20 mt-2">
+        Close
+      </button>
+    </div>
+  </div>
+
+  <!-- Theme Selector Side Panel Modal -->
+  <div id="theme-panel" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden flex justify-end transition-opacity duration-300">
+    <div class="bg-surface-card border-l border-surface-border w-full max-w-xs h-full p-6 shadow-2xl flex flex-col justify-between overflow-y-auto">
+      <div>
+        <div class="flex items-center justify-between pb-4 border-b border-surface-border/60 mb-5">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-brand-500">palette</span>
+            <h3 class="text-sm font-bold text-white uppercase tracking-wider">Room Themes</h3>
+          </div>
+          <button onclick="toggleThemePanel()" class="w-8 h-8 rounded-full bg-surface-hover flex items-center justify-center text-slate-400 hover:text-white">
+            <span class="material-symbols-outlined text-sm">close</span>
+          </button>
+        </div>
+
+        <div class="space-y-4">
+          <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wide">Color Theme</h4>
+          <div class="grid grid-cols-3 gap-3">
+            <button onclick="setAccentTheme('emerald')" class="flex flex-col items-center gap-1.5 p-2 rounded-xl border border-surface-border bg-slate-900/50 hover:border-emerald-500 transition-all">
+              <span class="w-7 h-7 rounded-full bg-emerald-500 shadow-md"></span>
+              <span class="text-[10px] font-semibold text-slate-300">Emerald</span>
+            </button>
+            <button onclick="setAccentTheme('blue')" class="flex flex-col items-center gap-1.5 p-2 rounded-xl border border-surface-border bg-slate-900/50 hover:border-blue-500 transition-all">
+              <span class="w-7 h-7 rounded-full bg-blue-500 shadow-md"></span>
+              <span class="text-[10px] font-semibold text-slate-300">Blue</span>
+            </button>
+            <button onclick="setAccentTheme('purple')" class="flex flex-col items-center gap-1.5 p-2 rounded-xl border border-surface-border bg-slate-900/50 hover:border-purple-500 transition-all">
+              <span class="w-7 h-7 rounded-full bg-purple-500 shadow-md"></span>
+              <span class="text-[10px] font-semibold text-slate-300">Purple</span>
+            </button>
+            <button onclick="setAccentTheme('amber')" class="flex flex-col items-center gap-1.5 p-2 rounded-xl border border-surface-border bg-slate-900/50 hover:border-amber-500 transition-all">
+              <span class="w-7 h-7 rounded-full bg-amber-500 shadow-md"></span>
+              <span class="text-[10px] font-semibold text-slate-300">Amber</span>
+            </button>
+            <button onclick="setAccentTheme('rose')" class="flex flex-col items-center gap-1.5 p-2 rounded-xl border border-surface-border bg-slate-900/50 hover:border-rose-500 transition-all">
+              <span class="w-7 h-7 rounded-full bg-rose-500 shadow-md"></span>
+              <span class="text-[10px] font-semibold text-slate-300">Crimson</span>
+            </button>
+            <button onclick="setAccentTheme('cyber')" class="flex flex-col items-center gap-1.5 p-2 rounded-xl border border-surface-border bg-slate-900/50 hover:border-cyan-400 transition-all">
+              <span class="w-7 h-7 rounded-full bg-cyan-400 shadow-md"></span>
+              <span class="text-[10px] font-semibold text-slate-300">Cyber</span>
+            </button>
+          </div>
+
+          <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wide pt-4">Background Pattern</h4>
+          <div class="grid grid-cols-2 gap-2">
+            <button onclick="setBackgroundPattern('grid')" class="px-3 py-2.5 rounded-xl border border-surface-border bg-slate-900/60 hover:bg-surface-hover text-xs font-semibold text-slate-200 text-center transition-all">
+              Tech Grid
+            </button>
+            <button onclick="setBackgroundPattern('radial')" class="px-3 py-2.5 rounded-xl border border-surface-border bg-slate-900/60 hover:bg-surface-hover text-xs font-semibold text-slate-200 text-center transition-all">
+              Soft Radial
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <button onclick="toggleThemePanel()" class="w-full py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 font-bold text-xs text-white transition-all shadow-lg shadow-brand-500/20">
+        Done
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Content Body -->
+  <main class="flex-grow pt-[84px] pb-6 px-5 flex flex-col gap-5 relative overflow-y-auto">
+    
+    <!-- Current User Banner Card -->
+    <section id="user-banner-card" class="bg-surface-card/80 backdrop-blur-md rounded-2xl p-4 border border-surface-border/80 flex items-center justify-between shadow-lg shadow-black/30 transition-all duration-300">
+      <div class="flex items-center gap-3.5 flex-grow">
+        <div id="user-avatar" class="w-11 h-11 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center font-bold text-white text-sm shadow-md flex-shrink-0 transition-all duration-500">
+          US
+        </div>
+        <div class="flex-grow min-w-0">
+          <h2 id="current-user-name" class="text-sm font-bold text-white tracking-wide truncate">Connecting...</h2>
+          <div class="flex items-center gap-2 mt-1">
+            <span id="current-user-role" class="px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider uppercase bg-surface-border/60 text-slate-300">Guest</span>
+            <div id="connection-indicator" class="flex items-center gap-1.5 text-emerald-400">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span class="text-[11px] font-medium" id="connection-status">Connecting...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <!-- Guest SOS Mute Toggle Button moved into user name card -->
+        <button id="guest-mute-sos-btn" onclick="toggleGuestSosMute()" title="Mute/Unmute SOS Audio" class="w-10 h-10 hidden items-center justify-center rounded-xl bg-amber-500/10 text-amber-400 hover:bg-amber-500 hover:text-white transition-all active:scale-95 border border-amber-500/20">
+          <span id="guest-mute-icon" class="material-symbols-outlined text-[20px]">volume_up</span>
+        </button>
+        <div id="banner-off-btn-container"></div>
+      </div>
+    </section>
+
+    <!-- Active Room Participants Card -->
+    <section class="flex-grow flex flex-col min-h-[160px]">
+      <div class="flex items-center justify-between mb-2.5 px-1">
+        <h3 id="active-members-count" class="text-xs font-bold uppercase tracking-wider text-slate-400">Active Members (0)</h3>
+        <span class="material-symbols-outlined text-slate-400 text-[18px]">group</span>
+      </div>
+      <div class="bg-surface-card/80 backdrop-blur-md rounded-2xl border border-surface-border/80 shadow-lg shadow-black/30 overflow-hidden flex-grow">
+        <ul id="members-list" class="divide-y divide-surface-border/40 max-h-48 overflow-y-auto"></ul>
+      </div>
+    </section>
+
+    <!-- Interactive PTT Section -->
+    <section class="py-4 flex flex-col items-center justify-center relative my-auto icon-3d-wrapper">
+      <div class="relative flex items-center justify-center">
+        <div id="ambient-glow" class="absolute w-56 h-56 rounded-full blur-3xl transition-all duration-700 animate-pulse bg-emerald-500/20"></div>
+        <button id="pttButton" class="w-44 h-44 rounded-full bg-gradient-to-b from-emerald-400 via-emerald-600 to-teal-800 text-white flex flex-col items-center justify-center gap-2 transition-all select-none z-10 ptt-ring ptt-3d-button focus:outline-none border-4 border-slate-900/80 active:scale-90">
+          <span class="material-symbols-outlined text-[56px] ptt-3d-icon" style="font-variation-settings: 'FILL' 1, 'wght' 500;">mic</span>
+          <span id="ptt-label" class="text-xs font-extrabold tracking-widest uppercase" style="transform: translateZ(15px);">Hold to Speak</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Controls -->
+    <section class="grid grid-cols-3 gap-2 mt-auto">
+      <button onclick="triggerSOS()" class="h-11 rounded-xl bg-red-600 hover:bg-red-700 text-white border border-red-500/30 flex items-center justify-center gap-1.5 transition-all font-bold text-xs active:scale-95 shadow-lg shadow-red-600/30">
+        <span class="material-symbols-outlined text-[18px]">sos</span> SOS
+      </button>
+      <button onclick="leaveRoom()" class="h-11 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 flex items-center justify-center gap-1.5 transition-all font-semibold text-xs active:scale-95">
+        <span class="material-symbols-outlined text-[18px]">call_end</span> Leave
+      </button>
+      <button onclick="showRoomInfo()" class="h-11 rounded-xl bg-surface-card hover:bg-surface-hover text-slate-200 border border-surface-border flex items-center justify-center gap-1.5 transition-all font-semibold text-xs active:scale-95 shadow-sm">
+        <span class="material-symbols-outlined text-[18px]">info</span> Info
+      </button>
+    </section>
+
+  </main>
+
+  <!-- GPS Map Modal -->
+  <div id="map-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="bg-surface-card border border-surface-border w-full max-w-sm rounded-3xl p-5 shadow-2xl flex flex-col gap-4 relative">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <span id="map-modal-icon" class="material-symbols-outlined text-emerald-500">location_on</span>
+          <div>
+            <h3 id="map-guest-name" class="text-sm font-bold text-white">Guest Location</h3>
+            <p class="text-[10px] text-slate-400">Live GPS Projection</p>
+          </div>
+        </div>
+        <button onclick="closeMapModal()" class="w-8 h-8 rounded-full bg-surface-hover flex items-center justify-center text-slate-300 hover:text-white">
+          <span class="material-symbols-outlined text-sm">close</span>
+        </button>
+      </div>
+      
+      <div id="map" class="shadow-inner border border-surface-border/50"></div>
+      
+      <div id="map-coords-info" class="text-center text-xs text-slate-400 bg-surface-base/60 py-2 rounded-xl border border-surface-border/40">
+        Acquiring live location updates...
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomId = urlParams.get('roomId') || '1';
+    const roomName = urlParams.get('roomName') || 'Voice Room';
+    const roomType = (urlParams.get('roomType') || 'family').toLowerCase();
+    const role = urlParams.get('role') || 'Guest';
+    const userName = urlParams.get('userName') || urlParams.get('adminUsername') || 'Administrator';
+
+    let ws = null;
+    let audioStream = null;
+    let audioContext = null;
+    let scriptProcessor = null;
+    let mediaStreamSource = null;
+    let connectedMembers = [];
+    let nextPlayTime = 0;
+    let isTransmitting = false;
+
+    // Guest SOS Mute Preference State
+    let isSosMuted = false;
+
+    // SOS State Variables & Tracking
+    let sosMode = '10s';
+    let activeSosUsers = {};   
+    let speechIntervals = {};
+    let mutedAlarmsLocally = {}; 
+    let sosTimers = {};
+
+    // Theme Config
+    let activeColorTheme = 'emerald';
+    let activePattern = 'radial';
+
+    const themeMap = {
+      emerald: {
+        bg: 'theme-emerald',
+        badgeBg: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+        iconBg: 'bg-gradient-to-br from-emerald-400 to-teal-700',
+        avatarBg: 'bg-gradient-to-tr from-emerald-600 via-teal-600 to-green-500',
+        pttBg: 'bg-gradient-to-b from-emerald-400 via-emerald-600 to-teal-800',
+        glow: 'bg-emerald-500/25',
+        dot: 'bg-emerald-400'
+      },
+      blue: {
+        bg: 'theme-blue',
+        badgeBg: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+        iconBg: 'bg-gradient-to-br from-blue-500 to-indigo-700',
+        avatarBg: 'bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500',
+        pttBg: 'bg-gradient-to-b from-blue-500 via-blue-600 to-indigo-800',
+        glow: 'bg-blue-500/25',
+        dot: 'bg-blue-400'
+      },
+      purple: {
+        bg: 'theme-purple',
+        badgeBg: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+        iconBg: 'bg-gradient-to-br from-purple-500 to-indigo-800',
+        avatarBg: 'bg-gradient-to-tr from-purple-600 via-fuchsia-600 to-pink-500',
+        pttBg: 'bg-gradient-to-b from-purple-500 via-purple-700 to-indigo-900',
+        glow: 'bg-purple-500/25',
+        dot: 'bg-purple-400'
+      },
+      amber: {
+        bg: 'theme-amber',
+        badgeBg: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+        iconBg: 'bg-gradient-to-br from-amber-500 to-orange-700',
+        avatarBg: 'bg-gradient-to-tr from-amber-600 via-orange-600 to-yellow-500',
+        pttBg: 'bg-gradient-to-b from-amber-400 via-amber-600 to-orange-800',
+        glow: 'bg-amber-500/25',
+        dot: 'bg-amber-400'
+      },
+      rose: {
+        bg: 'theme-rose',
+        badgeBg: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
+        iconBg: 'bg-gradient-to-br from-rose-500 to-red-800',
+        avatarBg: 'bg-gradient-to-tr from-rose-600 via-red-600 to-pink-600',
+        pttBg: 'bg-gradient-to-b from-rose-500 via-rose-700 to-red-900',
+        glow: 'bg-rose-500/25',
+        dot: 'bg-rose-400'
+      },
+      cyber: {
+        bg: 'theme-cyber',
+        badgeBg: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
+        iconBg: 'bg-gradient-to-br from-cyan-400 to-blue-700',
+        avatarBg: 'bg-gradient-to-tr from-cyan-500 via-teal-600 to-blue-600',
+        pttBg: 'bg-gradient-to-b from-cyan-400 via-teal-600 to-blue-800',
+        glow: 'bg-cyan-500/25',
+        dot: 'bg-cyan-400'
+      }
+    };
+
+    let leafletMap = null;
+    let mapMarker = null;
+    let memberLocations = {};
+    let selectedGuestName = null;
+
+    function setSosMode(mode) {
+      sosMode = mode;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'SET_SOS_MODE',
+          roomId,
+          mode: sosMode
+        }));
+      }
+    }
+
+    function getInitials(name) {
+      if (!name) return 'AD';
+      const parts = name.trim().split(/\s+/);
+      return parts.length >= 2 ? (parts[0][0] + parts[1][0]).toUpperCase() : name.slice(0, 2).toUpperCase();
+    }
+
+    function toggleRoomSettingsModal() {
+      if (role.toLowerCase() !== 'admin') return;
+      document.getElementById('room-settings-modal').classList.toggle('hidden');
+    }
+
+    function toggleThemePanel() {
+      document.getElementById('theme-panel').classList.toggle('hidden');
+    }
+
+    function toggleGuestSosMute() {
+      if (role.toLowerCase() !== 'guest') return;
+
+      isSosMuted = !isSosMuted;
+      const btnIcon = document.getElementById('guest-mute-icon');
+      const btn = document.getElementById('guest-mute-sos-btn');
+
+      if (isSosMuted) {
+        btnIcon.textContent = 'volume_off';
+        btn.title = "Unmute SOS Audio";
+        btn.className = "w-10 h-10 flex items-center justify-center rounded-xl bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white transition-all active:scale-95 border border-red-500/30";
+      } else {
+        btnIcon.textContent = 'volume_up';
+        btn.title = "Mute SOS Audio";
+        btn.className = "w-10 h-10 flex items-center justify-center rounded-xl bg-amber-500/10 text-amber-400 hover:bg-amber-500 hover:text-white transition-all active:scale-95 border border-amber-500/20";
+      }
+
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'SET_SOS_MUTE',
+          muted: isSosMuted
+        }));
+      }
+    }
+
+    function setAccentTheme(themeKey) {
+      activeColorTheme = themeKey;
+      const theme = themeMap[themeKey] || themeMap.emerald;
+      const body = document.getElementById('room-body');
+      
+      Object.keys(themeMap).forEach(k => body.classList.remove(themeMap[k].bg));
+      body.classList.add(theme.bg);
+
+      document.getElementById('room-type-icon-container').className = `w-10 h-10 rounded-xl flex items-center justify-center icon-3d-badge transition-all duration-500 ${theme.iconBg} text-white`;
+      document.getElementById('header-room-type-badge').className = `px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border transition-all duration-500 ${theme.badgeBg}`;
+      document.getElementById('security-dot').className = `w-1.5 h-1.5 rounded-full ${theme.dot}`;
+      document.getElementById('user-avatar').className = `w-11 h-11 rounded-xl flex items-center justify-center font-bold text-white text-sm shadow-md flex-shrink-0 transition-all duration-500 ${theme.avatarBg}`;
+      
+      const pttBtn = document.getElementById('pttButton');
+      if (!isTransmitting) {
+        pttBtn.className = `w-44 h-44 rounded-full text-white flex flex-col items-center justify-center gap-2 transition-all select-none z-10 ptt-ring ptt-3d-button focus:outline-none border-4 border-slate-900/80 active:scale-90 ${theme.pttBg}`;
+        document.getElementById('ambient-glow').className = `absolute w-56 h-56 rounded-full blur-3xl transition-all duration-700 animate-pulse ${theme.glow}`;
+      }
+    }
+
+    function setBackgroundPattern(patternType) {
+      activePattern = patternType;
+      const body = document.getElementById('room-body');
+      body.classList.remove('bg-pattern-grid', 'bg-pattern-radial');
+      body.classList.add(patternType === 'grid' ? 'bg-pattern-grid' : 'bg-pattern-radial');
+    }
+
+    function updateRoomTypeUI() {
+      const typeBadge = document.getElementById('header-room-type-badge');
+      const typeIcon = document.getElementById('room-type-icon');
+      const securityText = document.getElementById('security-status-text');
+
+      if (roomType === 'business') {
+        typeBadge.textContent = 'BUSINESS';
+        typeIcon.textContent = 'domain';
+        securityText.textContent = 'Encrypted Stream';
+        setAccentTheme('blue');
+        setBackgroundPattern('grid');
+      } else {
+        typeBadge.textContent = 'FAMILY';
+        typeIcon.textContent = 'family_restroom';
+        securityText.textContent = 'GPS Tracking Active';
+        setAccentTheme('emerald');
+        setBackgroundPattern('radial');
+      }
+
+      if (role.toLowerCase() === 'admin') {
+        document.getElementById('admin-room-settings-btn').classList.remove('hidden');
+        document.getElementById('admin-room-settings-btn').classList.add('flex');
+      } else if (role.toLowerCase() === 'guest') {
+        document.getElementById('guest-mute-sos-btn').classList.remove('hidden');
+        document.getElementById('guest-mute-sos-btn').classList.add('flex');
+      }
+    }
+
+    document.getElementById('header-room-name').textContent = roomName;
+    document.getElementById('current-user-name').textContent = userName;
+    document.getElementById('current-user-role').textContent = role.toUpperCase();
+    document.getElementById('user-avatar').textContent = getInitials(userName);
+    updateRoomTypeUI();
+
+    async function initAudioContext() {
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      }
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+    }
+
+    function startGPSWatch() {
+      if (roomType === 'business') return;
+
+      if ('geolocation' in navigator) {
+        navigator.geolocation.watchPosition(
+          (pos) => {
+            const { latitude, longitude } = pos.coords;
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({
+                type: 'LOCATION_UPDATE',
+                roomId,
+                userName,
+                location: { lat: latitude, lng: longitude }
+              }));
+            }
+          },
+          (err) => console.warn('GPS Error:', err.message),
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      }
+    }
+
+    async function initRoomConnection() {
+      try {
+        const protocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
+        ws = new WebSocket(`${protocol}${location.host}/ws/room`);
+
+        ws.onopen = () => {
+          document.getElementById('connection-status').textContent = 'Connected';
+          ws.send(JSON.stringify({ type: 'JOIN_ROOM', roomId, roomName, roomType, role, userName }));
+          startGPSWatch();
+        };
+
+        ws.onmessage = async (event) => {
+          if (typeof event.data === 'string') {
+            handleSignalingData(JSON.parse(event.data));
+          } else if (event.data instanceof Blob) {
+            if (role.toLowerCase() === 'guest' && isSosMuted) return;
+            playRawPcmStream(event.data);
+          }
+        };
+
+        ws.onclose = () => {
+          document.getElementById('connection-status').textContent = 'Disconnected';
+        };
+
+        audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (err) {
+        console.error('Audio/WS Error:', err);
+      }
+    }
+
+    async function playRawPcmStream(blob) {
+      if (role.toLowerCase() === 'guest' && isSosMuted) return;
+      await initAudioContext();
+      const arrayBuffer = await blob.arrayBuffer();
+      const pcmData = new Float32Array(arrayBuffer);
+
+      if (pcmData.length === 0) return;
+
+      const audioBuffer = audioContext.createBuffer(1, pcmData.length, audioContext.sampleRate);
+      audioBuffer.getChannelData(0).set(pcmData);
+
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContext.destination);
+
+      const currentTime = audioContext.currentTime;
+      if (nextPlayTime < currentTime) {
+        nextPlayTime = currentTime;
+      }
+      source.start(nextPlayTime);
+      nextPlayTime += audioBuffer.duration;
+    }
+
+    function triggerSOS() {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        const selectedRadio = document.querySelector('input[name="sosModeRadio"]:checked');
+        const activeMode = selectedRadio ? selectedRadio.value : sosMode;
+
+        ws.send(JSON.stringify({
+          type: 'SOS_ALERT',
+          roomId,
+          userName,
+          mode: activeMode,
+          timestamp: new Date().toISOString()
+        }));
+      }
+    }
+
+    function handleSOSActivation(senderName, mode = '10s') {
+      if (role.toLowerCase() === 'guest' && isSosMuted) {
+        return;
+      }
+
+      activeSosUsers[senderName] = true;
+      delete mutedAlarmsLocally[senderName];
+
+      if (speechIntervals[senderName]) {
+        clearInterval(speechIntervals[senderName]);
+        delete speechIntervals[senderName];
+      }
+      if (sosTimers[senderName]) {
+        clearTimeout(sosTimers[senderName]);
+        delete sosTimers[senderName];
+      }
+
+      renderMembersList();
+      renderUserBannerOffButton();
+
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        
+        const speakMessage = () => {
+          if (activeSosUsers[senderName] && !mutedAlarmsLocally[senderName]) {
+            const utterance = new SpeechSynthesisUtterance(`${senderName} needs help`);
+            utterance.rate = 0.95;
+            utterance.pitch = 1.1;
+            window.speechSynthesis.speak(utterance);
+          }
+        };
+
+        speakMessage();
+        speechIntervals[senderName] = setInterval(speakMessage, 3500);
+      }
+
+      let targetCard = (senderName === userName) ? document.getElementById('user-banner-card') : document.getElementById(`member-${senderName}`);
+      if (targetCard) targetCard.classList.add('sos-active-danger');
+
+      if (mode === '10s') {
+        sosTimers[senderName] = setTimeout(() => {
+          if (activeSosUsers[senderName]) stopUserSOSGlobal(senderName);
+        }, 10000);
+      } else if (mode === '1m') {
+        sosTimers[senderName] = setTimeout(() => {
+          if (activeSosUsers[senderName]) stopUserSOSGlobal(senderName);
+        }, 60000);
+      }
+    }
+
+    function handleOffClick(targetUser) {
+      if (role.toLowerCase() !== 'admin') return;
+
+      if (sosTimers[targetUser]) {
+        clearTimeout(sosTimers[targetUser]);
+        delete sosTimers[targetUser];
+      }
+
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'SOS_CLEAR',
+          roomId,
+          targetUser
+        }));
+      }
+    }
+
+    function stopUserSOSGlobal(targetUser) {
+      delete activeSosUsers[targetUser];
+      delete mutedAlarmsLocally[targetUser];
+
+      if (sosTimers[targetUser]) {
+        clearTimeout(sosTimers[targetUser]);
+        delete sosTimers[targetUser];
+      }
+
+      if (speechIntervals[targetUser]) {
+        clearInterval(speechIntervals[targetUser]);
+        delete speechIntervals[targetUser];
+      }
+
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+
+      let targetCard = (targetUser === userName) ? document.getElementById('user-banner-card') : document.getElementById(`member-${targetUser}`);
+      if (targetCard) targetCard.classList.remove('sos-active-danger');
+
+      renderMembersList();
+      renderUserBannerOffButton();
+    }
+
+    function handleSignalingData(data) {
+      switch (data.type) {
+        case 'ADMIN_NOT_PRESENT':
+          alert('Access Denied: An Admin must be present in the room for guests to join.');
+          window.location.href = '/dashboard.html';
+          break;
+
+        case 'ROOM_STATE_UPDATE':
+          connectedMembers = data.members || [];
+          if (data.sosMode) {
+            sosMode = data.sosMode;
+            const activeRadio = document.querySelector(`input[name="sosModeRadio"][value="${sosMode}"]`);
+            if (activeRadio) activeRadio.checked = true;
+          }
+          renderMembersList();
+          renderUserBannerOffButton();
+          break;
+
+        case 'LOCATION_BROADCAST':
+          if (roomType === 'family') {
+            memberLocations[data.userName] = data.location;
+            if (selectedGuestName === data.userName) {
+              updateMapPosition(data.userName, data.location);
+            }
+          }
+          break;
+
+        case 'ADMIN_LEFT':
+          if (role.toLowerCase() !== 'admin') {
+            alert('The Admin has left the room. Disconnecting session...');
+            window.location.href = '/dashboard.html';
+          }
+          break;
+
+        case 'USER_TRANSMITTING':
+          updateActiveSpeakerUI(data.userName, true);
+          break;
+
+        case 'USER_STOPPED_TRANSMITTING':
+          updateActiveSpeakerUI(data.userName, false);
+          break;
+
+        case 'SOS_BROADCAST':
+          handleSOSActivation(data.userName, data.mode);
+          break;
+
+        case 'SOS_CLEAR_BROADCAST':
+          stopUserSOSGlobal(data.targetUser);
+          break;
+
+        case 'SOS_MUTE_ACK':
+          isSosMuted = data.muted;
+          break;
+
+        case 'SOS_MODE_UPDATED':
+          sosMode = data.mode;
+          const targetRadio = document.querySelector(`input[name="sosModeRadio"][value="${sosMode}"]`);
+          if (targetRadio) targetRadio.checked = true;
+          break;
+      }
+    }
+
+    function renderUserBannerOffButton() {
+      const container = document.getElementById('banner-off-btn-container');
+      const isSosActive = activeSosUsers[userName];
+      const isAdmin = role.toLowerCase() === 'admin';
+
+      if (isSosActive && isAdmin) {
+        container.innerHTML = `
+          <button onclick="handleOffClick('${userName}')" class="px-3 py-1.5 bg-red-700 hover:bg-red-800 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-1 active:scale-95">
+            <span class="material-symbols-outlined text-[16px]">power_settings_new</span> Off
+          </button>
+        `;
+      } else {
+        container.innerHTML = '';
+      }
+    }
+
+    function renderMembersList() {
+      const membersList = document.getElementById('members-list');
+      document.getElementById('active-members-count').textContent = `Active Members (${connectedMembers.length})`;
+
+      const isAdmin = role.toLowerCase() === 'admin';
+      const isFamilyRoom = roomType === 'family';
+
+      membersList.innerHTML = connectedMembers.map(m => {
+        const canClick = isAdmin && isFamilyRoom;
+        const isRed = activeSosUsers[m.userName];
+        const redClass = isRed ? 'sos-active-danger' : '';
+
+        return `
+        <li ${canClick && !isRed ? `onclick="openGuestMap('${m.userName}', '${m.role}')"` : ''} 
+            class="flex items-center justify-between p-3 ${canClick && !isRed ? 'hover:bg-surface-hover/50 cursor-pointer' : 'cursor-default'} transition-colors select-none rounded-xl ${redClass}" 
+            id="member-${m.userName}">
+          <div class="flex items-center gap-3">
+            <div class="relative">
+              <div class="w-8 h-8 rounded-lg bg-surface-border flex items-center justify-center font-bold text-slate-200 text-xs border border-slate-700">
+                ${getInitials(m.userName)}
+              </div>
+              <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 border-2 border-surface-card rounded-full ${isRed ? 'bg-red-500 animate-ping' : 'bg-emerald-500'}"></span>
+            </div>
+            <div>
+              <p class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                ${m.userName} ${m.userName === userName ? `<span class="text-[10px] text-brand-500 font-bold">(You)</span>` : ''}
+              </p>
+              <p class="text-[9px] font-bold tracking-wider uppercase ${isRed ? 'text-red-200 font-extrabold' : 'text-slate-400'} mt-0.5">
+                ${isRed ? 'SOS ALERT ACTIVE' : m.role}
+              </p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            ${isRed && isAdmin ? `
+              <button onclick="handleOffClick('${m.userName}')" class="px-2.5 py-1 bg-red-700 hover:bg-red-800 text-white font-bold text-[10px] rounded-lg shadow transition-all flex items-center gap-1 active:scale-95">
+                <span class="material-symbols-outlined text-[14px]">power_settings_new</span> Off
+              </button>
+            ` : ''}
+            ${canClick && !isRed ? `<span class="material-symbols-outlined text-slate-500 hover:text-emerald-400 text-[18px] transition-colors" title="View Location">location_on</span>` : ''}
+            <span class="material-symbols-outlined text-slate-500 text-[18px] speaker-icon">mic_off</span>
+          </div>
+        </li>
+      `;}).join('');
+    }
+
+    function openGuestMap(targetUserName, targetRole) {
+      if (role.toLowerCase() !== 'admin' || roomType === 'business') return;
+
+      selectedGuestName = targetUserName;
+      document.getElementById('map-guest-name').textContent = `${targetUserName} (${targetRole})`;
+      document.getElementById('map-modal').classList.remove('hidden');
+
+      const loc = memberLocations[targetUserName];
+
+      if (!leafletMap) {
+        leafletMap = L.map('map').setView([loc ? loc.lat : 0, loc ? loc.lng : 0], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap'
+        }).addTo(leafletMap);
+      }
+
+      setTimeout(() => {
+        leafletMap.invalidateSize();
+        if (loc) {
+          updateMapPosition(targetUserName, loc);
+        } else {
+          document.getElementById('map-coords-info').textContent = 'Waiting for guest location signal...';
+        }
+      }, 200);
+    }
+
+    function updateMapPosition(targetUserName, loc) {
+      if (!leafletMap || !loc || roomType === 'business') return;
+      
+      const latLng = [loc.lat, loc.lng];
+      leafletMap.setView(latLng, 15);
+
+      if (mapMarker) {
+        mapMarker.setLatLng(latLng);
+      } else {
+        mapMarker = L.marker(latLng).addTo(leafletMap);
+      }
+
+      mapMarker.bindPopup(`<b>${targetUserName}</b><br>Lat: ${loc.lat.toFixed(4)}, Lng: ${loc.lng.toFixed(4)}`).openPopup();
+      document.getElementById('map-coords-info').textContent = `Latitude: ${loc.lat.toFixed(5)}, Longitude: ${loc.lng.toFixed(5)}`;
+    }
+
+    function closeMapModal() {
+      document.getElementById('map-modal').classList.add('hidden');
+      selectedGuestName = null;
+    }
+
+    function updateActiveSpeakerUI(speakerName, isSpeaking) {
+      const memberElem = document.getElementById(`member-${speakerName}`);
+      if (!memberElem) return;
+
+      const icon = memberElem.querySelector('.speaker-icon');
+      if (!icon) return;
+
+      if (isSpeaking) {
+        icon.textContent = 'volume_up';
+        icon.classList.remove('text-slate-500');
+        icon.classList.add('text-brand-500', 'animate-pulse');
+      } else {
+        icon.textContent = 'mic_off';
+        icon.classList.remove('text-brand-500', 'animate-pulse');
+        icon.classList.add('text-slate-500');
+      }
+    }
+
+    const pttBtn = document.getElementById('pttButton');
+    const pttLabel = document.getElementById('ptt-label');
+    const pttIcon = pttBtn.querySelector('.material-symbols-outlined');
+    const ambientGlow = document.getElementById('ambient-glow');
+
+    async function startTransmitting() {
+      await initAudioContext();
+      if (!ws || ws.readyState !== WebSocket.OPEN || !audioStream || isTransmitting) return;
+
+      isTransmitting = true;
+      const theme = themeMap[activeColorTheme];
+      
+      pttBtn.className = pttBtn.className.replace(theme.pttBg, 'bg-gradient-to-b from-rose-500 via-rose-600 to-red-800').replace('ptt-ring', 'ptt-transmitting');
+      pttIcon.style.fontVariationSettings = "'FILL' 1, 'wght' 700";
+      pttLabel.textContent = "Transmitting";
+      
+      ambientGlow.className = 'absolute w-56 h-56 rounded-full blur-3xl transition-all duration-700 animate-pulse bg-rose-500/40';
+
+      ws.send(JSON.stringify({ type: 'START_TALKING', roomId, userName }));
+
+      mediaStreamSource = audioContext.createMediaStreamSource(audioStream);
+      scriptProcessor = audioContext.createScriptProcessor(2048, 1, 1);
+
+      scriptProcessor.onaudioprocess = (e) => {
+        if (!isTransmitting) return;
+        const inputData = e.inputBuffer.getChannelData(0);
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(inputData.buffer);
+        }
+      };
+
+      const silentGain = audioContext.createGain();
+      silentGain.gain.value = 0;
+
+      mediaStreamSource.connect(scriptProcessor);
+      scriptProcessor.connect(silentGain);
+      silentGain.connect(audioContext.destination);
+    }
+
+    function stopTransmitting() {
+      if (!isTransmitting) return;
+
+      isTransmitting = false;
+      if (scriptProcessor) {
+        scriptProcessor.disconnect();
+        scriptProcessor = null;
+      }
+      if (mediaStreamSource) {
+        mediaStreamSource.disconnect();
+        mediaStreamSource = null;
+      }
+
+      const theme = themeMap[activeColorTheme];
+      
+      pttBtn.className = pttBtn.className.replace('bg-gradient-to-b from-rose-500 via-rose-600 to-red-800', theme.pttBg).replace('ptt-transmitting', 'ptt-ring');
+      pttIcon.style.fontVariationSettings = "'FILL' 1, 'wght' 500";
+      pttLabel.textContent = "Hold to Speak";
+      
+      ambientGlow.className = `absolute w-56 h-56 rounded-full blur-3xl transition-all duration-700 animate-pulse ${theme.glow}`;
+
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'STOP_TALKING', roomId, userName }));
+      }
+    }
+
+    pttBtn.addEventListener('mousedown', startTransmitting);
+    window.addEventListener('mouseup', stopTransmitting);
+    pttBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startTransmitting(); }, { passive: false });
+    window.addEventListener('touchend', stopTransmitting);
+
+    function leaveRoom() {
+      if (confirm('Are you sure you want to exit the voice room?')) {
+        if (ws) ws.close();
+        window.location.href = '/dashboard.html';
+      }
+    }
+
+    function showRoomInfo() {
+      alert(`Room: ${roomName}\nType: ${roomType.toUpperCase()}\nRole: ${role}\nUser: ${userName}`);
+    }
+
+    initRoomConnection();
+  </script>
+</body>
+</html>
