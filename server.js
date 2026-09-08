@@ -8,6 +8,9 @@ const WebSocket = require('ws');
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const { getAuth } = require('firebase-admin/auth');
+const { Resend } = require('resend');
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const privateKey = process.env.FIREBASE_PRIVATE_KEY
   ?.replace(/^"|"$/g, '')
@@ -66,6 +69,9 @@ const users = [];
 const rooms = [];
 const activeRoomSockets = new Map();
 const roomSettings = new Map();
+
+// Temporary OTP store for signup testing
+const signupOtps = new Map();
 
 function getRoomMemberCount(roomId) {
   const roomSockets = activeRoomSockets.get(roomId);
@@ -138,6 +144,174 @@ function broadcastRoomMembers(roomId) {
     }
   }
 }
+
+// ===============================
+// SIGNUP OTP - DEVELOPMENT TEST
+// ===============================
+app.post('/api/signup/send-otp', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required.'
+      });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Generate a random 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // OTP expires after 5 minutes
+    const expiresAt = Date.now() + 5 * 60 * 1000;
+
+    // Save OTP temporarily
+    signupOtps.set(normalizedEmail, {
+      otp,
+      expiresAt,
+      attempts: 0
+    });
+
+    // Send OTP email
+    const { data, error } = await resend.emails.send({
+      from: 'TalkieTalkie <onboarding@resend.dev>',
+      to: [normalizedEmail],
+      subject: 'Your TalkieTalkie verification code',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: auto;">
+          <h2>TalkieTalkie Email Verification</h2>
+
+          <p>Your verification code is:</p>
+
+          <div style="
+            font-size: 32px;
+            font-weight: bold;
+            letter-spacing: 8px;
+            padding: 20px;
+            text-align: center;
+            background: #f4f4f4;
+            border-radius: 10px;
+          ">
+            ${otp}
+          </div>
+
+          <p>This code expires in <strong>5 minutes</strong>.</p>
+
+          <p>If you did not request this code, you can ignore this email.</p>
+        </div>
+      `
+    });
+
+    if (error) {
+      console.error('Resend email error:', error);
+
+      // Remove OTP if email could not be sent
+      signupOtps.delete(normalizedEmail);
+
+      return res.status(500).json({
+        success: false,
+        message: 'Could not send verification email.'
+      });
+    }
+
+    console.log(
+  `OTP email sent to ${normalizedEmail} | PID: ${process.pid} | Stored: ${signupOtps.has(normalizedEmail)}`
+);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Verification code sent to your email.'
+    });
+
+  } catch (error) {
+    console.error('Send OTP error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Could not send verification email.'
+    });
+  }
+});
+// ===============================
+// VERIFY SIGNUP OTP
+// ===============================
+
+app.post('/api/signup/verify-otp', (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and OTP are required.'
+      });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const enteredOtp = String(otp).trim();
+
+    const savedData = signupOtps.get(normalizedEmail);
+    console.log(
+  `OTP verification for ${normalizedEmail} | PID: ${process.pid} | Found: ${!!savedData}`
+);
+
+    if (!savedData) {
+      return res.status(400).json({
+        success: false,
+        message: 'OTP not found. Please request a new OTP.'
+      });
+    }
+
+    // Check if OTP has expired
+    if (Date.now() > savedData.expiresAt) {
+      signupOtps.delete(normalizedEmail);
+
+      return res.status(400).json({
+        success: false,
+        message: 'OTP has expired. Please request a new OTP.'
+      });
+    }
+
+    // Check OTP
+    if (enteredOtp !== savedData.otp) {
+      savedData.attempts += 1;
+
+      if (savedData.attempts >= 5) {
+        signupOtps.delete(normalizedEmail);
+
+        return res.status(429).json({
+          success: false,
+          message: 'Too many incorrect attempts. Please request a new OTP.'
+        });
+      }
+
+      return res.status(400).json({
+        success: false,
+        message: 'Incorrect OTP.'
+      });
+    }
+
+    // OTP is correct
+    signupOtps.delete(normalizedEmail);
+
+    console.log(`OTP verified successfully for ${normalizedEmail}`);
+
+    return res.status(200).json({
+      success: true,
+      message: 'OTP verified successfully.'
+    });
+
+  } catch (error) {
+    console.error('OTP verification error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Could not verify OTP.'
+    });
+  }
+});
 
 // Authentication Routes
 app.post('/api/auth/signup', (req, res) => {
