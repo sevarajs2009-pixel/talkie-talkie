@@ -52,28 +52,6 @@ initializeApp({
 const firestore = getFirestore();
 const firebaseAuth = getAuth();
 const app = express();
-app.get('/api/test-firebase-admin', async (req, res) => {
-    try {
-        await firebaseAuth.listUsers(1);
-
-        res.json({
-            success: true,
-            message: "Firebase Admin key is working!"
-        });
-
-    } catch (error) {
-        console.error("Firebase Admin test failed:", error);
-
-        res.status(500).json({
-            success: false,
-            message: "Firebase Admin key test failed.",
-            error: error.message
-        });
-    }
-});
-
-
-
 const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
@@ -899,3 +877,4 @@ app.get('/room.html', (req, res) => {
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running at http://0.0.0.0:${PORT}`);
 });
+
