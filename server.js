@@ -51,6 +51,7 @@ initializeApp({
 
 const firestore = getFirestore();
 const firebaseAuth = getAuth();
+const app = express();
 app.get('/api/test-firebase-admin', async (req, res) => {
     try {
         await firebaseAuth.listUsers(1);
