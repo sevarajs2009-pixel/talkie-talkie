@@ -1,9 +1,14 @@
+﻿
+
+const crypto = require('crypto');
+const Razorpay = require('razorpay');
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const http = require('http');
 const WebSocket = require('ws');
+
 
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
@@ -51,33 +56,344 @@ initializeApp({
 
 const firestore = getFirestore();
 const firebaseAuth = getAuth();
+const razorpayKeyId = process.env.RAZORPAY_KEY_ID;
+const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET;
+console.log('--- Razorpay configuration check ---');
+console.log('Key ID loaded:', !!razorpayKeyId);
+console.log('Key ID prefix:', razorpayKeyId ? razorpayKeyId.substring(0, 8) : 'MISSING');
+console.log('Secret loaded:', !!razorpayKeySecret);
+console.log('Secret length:', razorpayKeySecret ? razorpayKeySecret.length : 0);
+console.log('------------------------------------');
+
+
+const razorpay =
+  razorpayKeyId && razorpayKeySecret
+    ? new Razorpay({
+        key_id: razorpayKeyId,
+        key_secret: razorpayKeySecret
+      })
+    : null;
+async function verifyFirebaseToken(req) {
+  const authHeader = req.headers.authorization || '';
+
+  if (!authHeader.startsWith('Bearer ')) {
+    throw new Error('NO_TOKEN');
+  }
+
+  const idToken = authHeader.substring(7).trim();
+
+  if (!idToken) {
+    throw new Error('NO_TOKEN');
+  }
+
+  return await firebaseAuth.verifyIdToken(idToken);
+}
+
 
 const app = express();
-const PORT = process.env.PORT || 5000;
 
+
+const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
 
-app.get('/api/test-firebase-admin', async (req, res) => {
-    try {
-        await firebaseAuth.listUsers(1);
+// ============================================================
+// RAZORPAY PAYMENT ROUTES
+// ============================================================
 
-        res.json({
-            success: true,
-            message: "Firebase Admin key is working!"
-        });
-
-    } catch (error) {
-        console.error("Firebase Admin test failed:", error);
-
-        res.status(500).json({
-            success: false,
-            message: "Firebase Admin key test failed.",
-            error: error.message
-        });
+// Create a Razorpay order
+app.post('/api/payment/create-order', async (req, res) => {
+  try {
+    if (!razorpay) {
+      return res.status(503).json({
+        success: false,
+        message: 'Payment gateway is not configured on the server.'
+      });
     }
+
+    // Verify Firebase login
+    const decodedToken = await verifyFirebaseToken(req);
+    const uid = decodedToken.uid;
+
+    // Product information
+    const plan = req.body.plan || 'extra_room_india';
+
+    // IMPORTANT:
+    // Razorpay amount is in the smallest currency unit.
+    // â‚¹100 = 10000 paise.
+    //
+    // Change this amount when your final pricing is decided.
+    const plans = {
+  // EXISTING PLAN â€” DO NOT CHANGE
+  extra_room_india: {
+    amount: 8000, // â‚¹80 = 8000 paise
+    currency: 'INR',
+    name: 'TalkieTalkie Extra Room - India'
+  },
+
+  // EXISTING PLAN â€” DO NOT CHANGE
+  extra_room_usd: {
+    amount: 100, // $1 = 100 cents
+    currency: 'USD',
+    name: 'TalkieTalkie Extra Room - International'
+  },
+
+  // NEW COMMON $3 UPGRADE
+  premium_upgrade: {
+    amount: 300, // $3 = 300 cents
+    currency: 'USD',
+    name: 'TalkieTalkie Premium Upgrade'
+  }
+};
+
+    const selectedPlan = plans[plan];
+
+    if (!selectedPlan) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid payment plan.'
+      });
+    }
+
+    const receipt = `tt_${uid}_${Date.now()}`;
+
+    const order = await razorpay.orders.create({
+      amount: selectedPlan.amount,
+      currency: selectedPlan.currency,
+      receipt,
+      notes: {
+        uid,
+        plan
+      }
+    });
+
+    // Save the pending order in Firestore
+    await firestore
+      .collection('paymentOrders')
+      .doc(order.id)
+      .set({
+        uid,
+        orderId: order.id,
+        plan,
+        amount: selectedPlan.amount,
+        currency: selectedPlan.currency,
+        status: 'created',
+        createdAt: new Date().toISOString()
+      });
+
+    return res.status(200).json({
+      success: true,
+      keyId: razorpayKeyId,
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      plan,
+      name: selectedPlan.name
+    });
+
+  } catch (error) {
+    console.error('Create Razorpay order error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to create payment order.'
+    });
+  }
 });
+
+
+// Verify Razorpay payment
+app.post('/api/payment/verify', async (req, res) => {
+  console.log('>>> PAYMENT VERIFY ROUTE CALLED');
+  try {
+    if (!razorpay) {
+      return res.status(503).json({
+        success: false,
+        message: 'Payment gateway is not configured on the server.'
+      });
+    }
+
+    // Verify Firebase login
+    const decodedToken = await verifyFirebaseToken(req);
+    const uid = decodedToken.uid;
+
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature
+    } = req.body;
+
+    if (
+      !razorpay_order_id ||
+      !razorpay_payment_id ||
+      !razorpay_signature
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Incomplete payment verification data.'
+      });
+    }
+
+    // Get the order that OUR server created
+    const orderRef = firestore
+      .collection('paymentOrders')
+      .doc(razorpay_order_id);
+
+    const orderSnapshot = await orderRef.get();
+
+    if (!orderSnapshot.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Payment order not found.'
+      });
+    }
+
+    const orderData = orderSnapshot.data();
+
+    // Make sure this order belongs to the logged-in Firebase user
+    if (orderData.uid !== uid) {
+      return res.status(403).json({
+        success: false,
+        message: 'Payment order does not belong to this account.'
+      });
+    }
+
+    // Prevent processing the same order twice
+    if (orderData.status === 'paid') {
+      return res.status(200).json({
+        success: true,
+        message: 'Payment was already verified.'
+      });
+    }
+
+    // Razorpay signature verification
+    const generatedSignature = crypto
+      .createHmac('sha256', razorpayKeySecret)
+      .update(
+        `${orderData.orderId}|${razorpay_payment_id}`
+      )
+      .digest('hex');
+
+    if (generatedSignature !== razorpay_signature) {
+      await orderRef.update({
+        status: 'verification_failed',
+        verificationFailedAt: new Date().toISOString()
+      });
+
+      return res.status(400).json({
+        success: false,
+        message: 'Payment signature verification failed.'
+      });
+    }
+
+    // --------------------------------------------------------
+    // PAYMENT IS AUTHENTIC
+    // --------------------------------------------------------
+
+    await orderRef.update({
+      status: 'paid',
+      paymentId: razorpay_payment_id,
+      signature: razorpay_signature,
+      paidAt: new Date().toISOString()
+    });
+
+    // Save payment history
+    await firestore
+      .collection('users')
+      .doc(uid)
+      .collection('payments')
+      .doc(razorpay_payment_id)
+      .set({
+        paymentId: razorpay_payment_id,
+        orderId: razorpay_order_id,
+        plan: orderData.plan,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        status: 'paid',
+        paidAt: new Date().toISOString()
+      });
+
+    // --------------------------------------------------------
+    // GRANT ENTITLEMENT
+    // --------------------------------------------------------
+
+    const entitlementRef = firestore
+      .collection('users')
+      .doc(uid)
+      .collection('entitlements')
+      .doc(orderData.plan);
+
+    const entitlementSnapshot = await entitlementRef.get();
+
+    let currentQuantity = 0;
+
+    if (entitlementSnapshot.exists) {
+      currentQuantity =
+        Number(entitlementSnapshot.data().quantity || 0);
+    }
+
+    await entitlementRef.set({
+      plan: orderData.plan,
+      quantity: currentQuantity + 1,
+      active: true,
+      updatedAt: new Date().toISOString()
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Payment verified and entitlement activated.',
+      plan: orderData.plan
+    });
+
+  } catch (error) {
+    console.error('Razorpay payment verification error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to verify payment.'
+    });
+  }
+});
+
+
+// Get current payment/entitlement status
+app.get('/api/payment/status', async (req, res) => {
+  try {
+    const decodedToken = await verifyFirebaseToken(req);
+    const uid = decodedToken.uid;
+
+    const entitlementSnapshot = await firestore
+      .collection('users')
+      .doc(uid)
+      .collection('entitlements')
+      .get();
+
+    const entitlements = {};
+
+    entitlementSnapshot.forEach((doc) => {
+      entitlements[doc.id] = doc.data();
+    });
+
+    return res.status(200).json({
+      success: true,
+      entitlements
+    });
+
+  } catch (error) {
+    console.error('Payment status error:', error);
+
+    return res.status(401).json({
+      success: false,
+      message: 'Unable to read payment status.'
+    });
+  }
+});
+
+
+
+
+
 
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ noServer: true });
@@ -86,10 +402,59 @@ const wss = new WebSocket.Server({ noServer: true });
 const users = [];
 const rooms = [];
 const activeRoomSockets = new Map();
+// ============================================================
+// BUSINESS CHAT â€” IN-MEMORY CHAT HISTORY
+// Business rooms only
+// ============================================================
+const roomChatHistory = new Map();
+
+function isBusinessRoomType(roomType) {
+  return String(roomType || '').toLowerCase() === 'business';
+}
+
+function getRoomType(room) {
+  return String(room?.roomType || room?.type || '').toLowerCase();
+}
+
+function getBusinessChatHistory(roomId) {
+  return roomChatHistory.get(String(roomId)) || [];
+}
+
+function addBusinessChatMessage(roomId, message) {
+  const key = String(roomId);
+
+  const history = roomChatHistory.get(key) || [];
+
+  history.push(message);
+
+  // Keep only the latest 50 messages
+  if (history.length > 50) {
+    history.splice(0, history.length - 50);
+  }
+
+  roomChatHistory.set(key, history);
+}
+
+function broadcastBusinessChat(roomId, payload) {
+  const roomSockets = activeRoomSockets.get(roomId);
+
+  if (!roomSockets) return;
+
+  for (const client of roomSockets) {
+    if (
+      client.readyState === WebSocket.OPEN &&
+      isBusinessRoomType(client.roomType)
+    ) {
+      client.send(JSON.stringify(payload));
+    }
+  }
+}
 const roomSettings = new Map();
 
 // Temporary OTP store for signup testing
 const signupOtps = new Map();
+// Firebase users who successfully verified a private room passcode
+const verifiedRoomAccess = new Map();
 
 function getRoomMemberCount(roomId) {
   const roomSockets = activeRoomSockets.get(roomId);
@@ -103,15 +468,71 @@ function getRoomMemberCount(roomId) {
   return count;
 }
 
+
+
 function isAdminInRoom(roomId) {
+
   const roomSockets = activeRoomSockets.get(roomId);
+
   if (!roomSockets) return false;
+
   for (const client of roomSockets) {
-    if (client.readyState === WebSocket.OPEN && client.userRole && client.userRole.toLowerCase() === 'admin') {
+
+    if (
+      client.readyState === WebSocket.OPEN &&
+      client.userRole &&
+      client.userRole.toLowerCase() === 'admin'
+    ) {
       return true;
     }
+
   }
+
   return false;
+}
+
+
+// ============================================================
+// CHECK WHETHER A ROOM OWNER HAS MEMBER UPGRADE
+// ============================================================
+async function hasUnlimitedMembers(room) {
+  try {
+    if (!room || !room.ownerUid) {
+      return false;
+    }
+
+    const entitlementSnapshot = await firestore
+      .collection('users')
+      .doc(room.ownerUid)
+      .collection('entitlements')
+      .get();
+
+    let hasUpgrade = false;
+
+    entitlementSnapshot.forEach((doc) => {
+      const data = doc.data();
+
+      const isValidPlan =
+        doc.id === 'extra_room' ||
+        doc.id === 'extra_room_india' ||
+        doc.id === 'extra_room_usd'||
+        doc.id === 'premium_upgrade';
+
+      if (
+        isValidPlan &&
+        data.active === true &&
+        Number(data.quantity || 0) > 0
+      ) {
+        hasUpgrade = true;
+      }
+    });
+
+    return hasUpgrade;
+
+  } catch (error) {
+    console.error('Member upgrade check failed:', error);
+    return false;
+  }
 }
 
 function updateRoomGuestsList(roomId) {
@@ -194,34 +615,20 @@ app.post('/api/signup/send-otp', async (req, res) => {
 
     // Send OTP email
     const { data, error } = await resend.emails.send({
-      from: 'TalkieTalkie <onboarding@resend.dev>',
-      to: [normalizedEmail],
-      subject: 'Your TalkieTalkie verification code',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: auto;">
-          <h2>TalkieTalkie Email Verification</h2>
-
-          <p>Your verification code is:</p>
-
-          <div style="
-            font-size: 32px;
-            font-weight: bold;
-            letter-spacing: 8px;
-            padding: 20px;
-            text-align: center;
-            background: #f4f4f4;
-            border-radius: 10px;
-          ">
-            ${otp}
-          </div>
-
-          <p>This code expires in <strong>5 minutes</strong>.</p>
-
-          <p>If you did not request this code, you can ignore this email.</p>
-        </div>
-      `
-    });
-
+  from: 'TalkieTalkie <onboarding@resend.dev>',
+  to: [normalizedEmail],
+  subject: 'Your TalkieTalkie verification code',
+  html:
+    '<div style="font-family: Arial, sans-serif; max-width: 500px; margin: auto;">' +
+    '<h2>TalkieTalkie Email Verification</h2>' +
+    '<p>Your verification code is:</p>' +
+    '<div style="font-size: 32px; font-weight: bold; letter-spacing: 8px; padding: 20px; text-align: center; background: #f4f4f4; border-radius: 10px;">' +
+    otp +
+    '</div>' +
+    '<p>This code expires in <strong>5 minutes</strong>.</p>' +
+    '<p>If you did not request this code, you can ignore this email.</p>' +
+    '</div>'
+});
     if (error) {
       console.error('Resend email error:', error);
 
@@ -234,8 +641,13 @@ app.post('/api/signup/send-otp', async (req, res) => {
       });
     }
 
-    console.log(
-  `OTP email sent to ${normalizedEmail} | PID: ${process.pid} | Stored: ${signupOtps.has(normalizedEmail)}`
+  console.log(
+  'OTP email sent to ' +
+  normalizedEmail +
+  ' | PID: ' +
+  process.pid +
+  ' | Stored: ' +
+  signupOtps.has(normalizedEmail)
 );
 
     return res.status(200).json({
@@ -662,6 +1074,28 @@ app.post('/api/rooms/verify', async (req, res) => {
       });
     }
 
+    // Guests can join only when the Admin is currently inside the room
+const liveRoomId = targetRoom.roomId || targetRoom.id;
+
+if (!isAdminInRoom(liveRoomId)) {
+  return res.status(403).json({
+    success: false,
+    code: 'ADMIN_NOT_PRESENT',
+    message: 'Access denied: The Admin is not currently present in this voice room.'
+  });
+}
+
+  const verifiedRoomId = targetRoom.id;
+
+verifiedRoomAccess.set(
+  `${guestUid}:${verifiedRoomId}`,
+  {
+    uid: guestUid,
+    roomId: verifiedRoomId,
+    verifiedAt: Date.now(),
+    expiresAt: Date.now() + 10 * 60 * 1000
+  }
+);
     console.log(
       `Guest ${guestUid} successfully verified for room ${targetRoom.roomId || targetRoom.id}`
     );
@@ -690,13 +1124,52 @@ app.post('/api/rooms/verify', async (req, res) => {
   }
 });
 // WebSocket Server & Upgrade Handler
-server.on('upgrade', (request, socket, head) => {
-  const pathname = new URL(request.url, `http://${request.headers.host}`).pathname;
-  if (pathname === '/ws/room') {
+
+server.on('upgrade', async (request, socket, head) => {
+  try {
+    const requestUrl = new URL(
+      request.url,
+      `http://${request.headers.host}`
+    );
+
+    const pathname = requestUrl.pathname;
+
+    if (pathname !== '/ws/room') {
+      socket.destroy();
+      return;
+    }
+
+    // Firebase ID token is temporarily passed through the WebSocket URL.
+    const idToken = requestUrl.searchParams.get('token');
+
+    if (!idToken) {
+      socket.write(
+        'HTTP/1.1 401 Unauthorized\r\n' +
+        'Connection: close\r\n\r\n'
+      );
+      socket.destroy();
+      return;
+    }
+
+    // Verify the Firebase user before allowing the WebSocket connection.
+    const decodedToken = await firebaseAuth.verifyIdToken(idToken);
+
+    // Store the verified Firebase identity on the WebSocket.
     wss.handleUpgrade(request, socket, head, (ws) => {
+      ws.firebaseUid = decodedToken.uid;
+      ws.firebaseEmail = decodedToken.email || null;
+
       wss.emit('connection', ws, request);
     });
-  } else {
+
+  } catch (error) {
+    console.error('WebSocket Firebase authentication failed:', error.message);
+
+    socket.write(
+      'HTTP/1.1 401 Unauthorized\r\n' +
+      'Connection: close\r\n\r\n'
+    );
+
     socket.destroy();
   }
 });
@@ -704,11 +1177,15 @@ server.on('upgrade', (request, socket, head) => {
 wss.on('connection', (ws) => {
   ws.roomId = null;
   ws.userName = null;
+  ws.roomType = null;
   ws.userRole = null;
   ws.joinedAt = null;
   ws.isSosMuted = false;
+  // Business Video Conference
+ws.videoPeerId = crypto.randomUUID();
+ws.videoConferenceActive = false;
 
-  ws.on('message', (message, isBinary) => {
+  ws.on('message', async (message, isBinary) => {
     if (isBinary) {
       if (!ws.roomId) return;
       const roomSockets = activeRoomSockets.get(ws.roomId);
@@ -729,42 +1206,434 @@ wss.on('connection', (ws) => {
       const data = JSON.parse(message.toString());
 
       if (data.type === 'JOIN_ROOM') {
-        const { roomId, role, userName } = data;
+  try {
+    const requestedRoomId = String(data.roomId || '').trim();
 
-        const currentMemberCount = getRoomMemberCount(roomId);
-        if (currentMemberCount >= 6) {
-          ws.send(JSON.stringify({ 
-            type: 'ROOM_FULL', 
-            code: 'LIMIT_ROOM_FULL',
-            message: 'Room is full (1 Admin + 5 Guests max).' 
-          }));
-          ws.close();
-          return;
-        }
+    if (!requestedRoomId) {
+      ws.send(JSON.stringify({
+        type: 'JOIN_ERROR',
+        message: 'Room ID is required.'
+      }));
+      ws.close();
+      return;
+    }
 
-        if (role.toLowerCase() === 'guest' && !isAdminInRoom(roomId)) {
-          ws.send(JSON.stringify({ type: 'ADMIN_NOT_PRESENT' }));
-          ws.close();
-          return;
-        }
+    // Find the room in Firestore
+    const roomRef = firestore.collection('rooms').doc(requestedRoomId);
+    const roomSnapshot = await roomRef.get();
 
-        ws.roomId = roomId;
-        ws.userRole = role;
-        ws.userName = userName || (role.toLowerCase() === 'admin' ? 'Administrator' : 'GuestUser');
-        ws.joinedAt = new Date().toLocaleTimeString();
+    if (!roomSnapshot.exists) {
+      ws.send(JSON.stringify({
+        type: 'JOIN_ERROR',
+        message: 'Room not found.'
+      }));
+      ws.close();
+      return;
+    }
 
-        if (!activeRoomSockets.has(roomId)) {
-          activeRoomSockets.set(roomId, new Set());
-        }
-        activeRoomSockets.get(roomId).add(ws);
+    const room = roomSnapshot.data();
 
-        if (!roomSettings.has(roomId)) {
-          roomSettings.set(roomId, { sosMode: '10s' });
-        }
+    // Room must be active
+    if (room.status && room.status !== 'Active') {
+      ws.send(JSON.stringify({
+        type: 'JOIN_ERROR',
+        message: 'This room is not currently active.'
+      }));
+      ws.close();
+      return;
+    }
 
-        updateRoomGuestsList(roomId);
-        broadcastRoomMembers(roomId);
+    // Firebase identity was verified when WebSocket connected
+    const firebaseUid = ws.firebaseUid;
+
+    if (!firebaseUid) {
+      ws.send(JSON.stringify({
+        type: 'JOIN_ERROR',
+        message: 'Firebase identity is missing.'
+      }));
+      ws.close();
+      return;
+    }
+
+    /*
+     * SECURITY:
+     * Do not trust role or username sent by the browser.
+     *
+     * If this Firebase user owns the room,
+     * they are the Admin.
+     *
+     * Otherwise, they are a Guest.
+     */
+    const isRoomOwner =
+      String(room.ownerUid || '') === String(firebaseUid);
+
+    const finalRole = isRoomOwner ? 'Admin' : 'Guest';
+
+    // Check whether this guest has verified the room passcode
+if (!isRoomOwner) {
+  const accessKey = `${firebaseUid}:${roomSnapshot.id}`;
+  const verifiedAccess = verifiedRoomAccess.get(accessKey);
+
+  if (!verifiedAccess || verifiedAccess.expiresAt < Date.now()) {
+    if (verifiedAccess) {
+      verifiedRoomAccess.delete(accessKey);
+    }
+
+    ws.send(JSON.stringify({
+      type: 'JOIN_ERROR',
+      code: 'ROOM_VERIFICATION_REQUIRED',
+      message: 'Please verify the room passcode before joining.'
+    }));
+
+    ws.close();
+    return;
+  }
+}
+
+    // Get the real username from Firestore
+    const userRef = firestore.collection('users').doc(firebaseUid);
+    const userSnapshot = await userRef.get();
+
+    let finalUserName = ws.firebaseEmail || 'GuestUser';
+
+    if (userSnapshot.exists) {
+      const userData = userSnapshot.data();
+
+      if (userData.username) {
+        finalUserName = String(userData.username).trim();
+      } else if (userData.fullName) {
+        finalUserName = String(userData.fullName).trim();
       }
+    }
+
+    // Guests can enter only when an Admin is already inside
+    if (finalRole === 'Guest' && !isAdminInRoom(requestedRoomId)) {
+      ws.send(JSON.stringify({
+        type: 'ADMIN_NOT_PRESENT'
+      }));
+      ws.close();
+      return;
+    }
+
+    // Check room capacity
+    // ============================================================
+// ROOM MEMBER CAPACITY
+// FREE ROOM  = 6 TOTAL MEMBERS
+// UPGRADED   = HIGH CAPACITY
+// ============================================================
+
+const currentMemberCount =
+  getRoomMemberCount(requestedRoomId);
+
+const roomOwnerHasUpgrade =
+  await hasUnlimitedMembers(room);
+
+const FREE_ROOM_LIMIT = 6;
+
+// Use a high server-safe ceiling instead of a literal
+// infinite number of WebSocket connections.
+const UPGRADED_ROOM_LIMIT = 1000;
+
+const maximumMembers = roomOwnerHasUpgrade
+  ? UPGRADED_ROOM_LIMIT
+  : FREE_ROOM_LIMIT;
+
+if (currentMemberCount >= maximumMembers) {
+
+  ws.send(JSON.stringify({
+    type: 'ROOM_FULL',
+    code: roomOwnerHasUpgrade
+      ? 'LIMIT_ROOM_CAPACITY'
+      : 'LIMIT_ROOM_FULL',
+
+    message: roomOwnerHasUpgrade
+      ? 'This room has reached the current server capacity.'
+      : 'Free room limit reached (1 Admin + 5 Guests). Upgrade to add more members.'
+  }));
+
+  ws.close();
+  return;
+}
+
+    // Server-controlled identity
+  ws.roomId = requestedRoomId;
+ws.roomType = getRoomType(room);
+ws.userRole = finalRole;
+ws.userName = finalUserName;
+ws.joinedAt = new Date().toLocaleTimeString();
+
+    if (!activeRoomSockets.has(requestedRoomId)) {
+      activeRoomSockets.set(requestedRoomId, new Set());
+    }
+
+    activeRoomSockets.get(requestedRoomId).add(ws);
+
+    // Send Business chat history to the newly joined Business user
+if (isBusinessRoomType(ws.roomType)) {
+  ws.send(JSON.stringify({
+    type: 'CHAT_HISTORY',
+    messages: getBusinessChatHistory(requestedRoomId)
+  }));
+}
+
+    if (!roomSettings.has(requestedRoomId)) {
+      roomSettings.set(requestedRoomId, {
+        sosMode: '10s'
+      });
+    }
+
+    updateRoomGuestsList(requestedRoomId);
+    broadcastRoomMembers(requestedRoomId);
+
+    console.log(
+      `WebSocket room joined | UID: ${firebaseUid} | Room: ${requestedRoomId} | Role: ${finalRole} | Username: ${finalUserName}`
+    );
+
+  } catch (error) {
+    console.error('JOIN_ROOM authorization error:', error);
+
+    ws.send(JSON.stringify({
+      type: 'JOIN_ERROR',
+      message: 'Unable to authorize room access.'
+    }));
+
+    ws.close();
+  }
+}
+
+// ============================================================
+// BUSINESS VIDEO CONFERENCE â€” WEBRTC SIGNALING
+// ============================================================
+
+if (
+  data.type === 'VIDEO_JOIN' ||
+  data.type === 'VIDEO_OFFER' ||
+  data.type === 'VIDEO_ANSWER' ||
+  data.type === 'VIDEO_ICE' ||
+  data.type === 'VIDEO_LEAVE'
+) {
+
+  // Video Conference is Business-only
+  if (!ws.roomId || !isBusinessRoomType(ws.roomType)) {
+    ws.send(JSON.stringify({
+      type: 'VIDEO_ERROR',
+      message: 'Video Conference is available only in Business rooms.'
+    }));
+    return;
+  }
+
+  const roomSockets = activeRoomSockets.get(ws.roomId);
+
+  if (!roomSockets) {
+    return;
+  }
+
+  // ------------------------------------------------------------
+  // VIDEO_JOIN
+  // Tell the new participant who is already inside the
+  // Business video conference.
+  // ------------------------------------------------------------
+
+  if (data.type === 'VIDEO_JOIN') {
+
+      if (String(data.roomId || '') !== String(ws.roomId || '')) {
+    ws.send(JSON.stringify({
+      type: 'VIDEO_ERROR',
+      message: 'Invalid video room.'
+    }));
+    return;
+  }
+
+    for (const client of roomSockets) {
+
+      if (
+        client !== ws &&
+        client.readyState === WebSocket.OPEN &&
+        client.videoConferenceActive === true
+      ) {
+
+        // Tell existing participant about the new participant
+        client.send(JSON.stringify({
+          type: 'VIDEO_PEER_JOINED',
+          peerId: ws.videoPeerId,
+          userName: ws.userName
+        }));
+
+        // Tell new participant about existing participant
+        ws.send(JSON.stringify({
+          type: 'VIDEO_EXISTING_PEER',
+          peerId: client.videoPeerId,
+          userName: client.userName
+        }));
+      }
+    }
+
+    ws.videoConferenceActive = true;
+
+    console.log(
+      `VIDEO JOIN | ${ws.userName} | Room: ${ws.roomId}`
+    );
+
+    return;
+  }
+
+  // ------------------------------------------------------------
+  // VIDEO_OFFER
+  // ------------------------------------------------------------
+
+  if (data.type === 'VIDEO_OFFER') {
+
+    const target = [...roomSockets].find(
+      client => client.videoPeerId === data.targetPeerId
+    );
+
+    if (
+      target &&
+      target.readyState === WebSocket.OPEN &&
+      target.videoConferenceActive === true
+    ) {
+
+      target.send(JSON.stringify({
+        type: 'VIDEO_OFFER',
+        fromPeerId: ws.videoPeerId,
+        fromUserName: ws.userName,
+        offer: data.offer
+      }));
+    }
+
+    return;
+  }
+
+  // ------------------------------------------------------------
+  // VIDEO_ANSWER
+  // ------------------------------------------------------------
+
+  if (data.type === 'VIDEO_ANSWER') {
+
+    const target = [...roomSockets].find(
+      client => client.videoPeerId === data.targetPeerId
+    );
+
+    if (
+      target &&
+      target.readyState === WebSocket.OPEN &&
+      target.videoConferenceActive === true
+    ) {
+
+      target.send(JSON.stringify({
+        type: 'VIDEO_ANSWER',
+        fromPeerId: ws.videoPeerId,
+        answer: data.answer
+      }));
+    }
+
+    return;
+  }
+
+  // ------------------------------------------------------------
+  // VIDEO_ICE
+  // ------------------------------------------------------------
+
+  if (data.type === 'VIDEO_ICE') {
+
+    const target = [...roomSockets].find(
+      client => client.videoPeerId === data.targetPeerId
+    );
+
+    if (
+      target &&
+      target.readyState === WebSocket.OPEN &&
+      target.videoConferenceActive === true
+    ) {
+
+      target.send(JSON.stringify({
+        type: 'VIDEO_ICE',
+        fromPeerId: ws.videoPeerId,
+        candidate: data.candidate
+      }));
+    }
+
+    return;
+  }
+
+  // ------------------------------------------------------------
+  // VIDEO_LEAVE
+  // ------------------------------------------------------------
+
+  if (data.type === 'VIDEO_LEAVE') {
+
+    ws.videoConferenceActive = false;
+
+    for (const client of roomSockets) {
+
+      if (
+        client !== ws &&
+        client.readyState === WebSocket.OPEN
+      ) {
+
+        client.send(JSON.stringify({
+          type: 'VIDEO_PEER_LEFT',
+          peerId: ws.videoPeerId
+        }));
+      }
+    }
+
+    console.log(
+      `VIDEO LEAVE | ${ws.userName} | Room: ${ws.roomId}`
+    );
+
+    return;
+  }
+}
+
+      // ============================================================
+// BUSINESS CHAT â€” SEND MESSAGE
+// ============================================================
+if (data.type === 'CHAT_SEND') {
+
+  // Only Business rooms can use chat
+  if (!isBusinessRoomType(ws.roomType)) {
+    ws.send(JSON.stringify({
+      type: 'CHAT_ERROR',
+      message: 'Chat is available only in Business rooms.'
+    }));
+    return;
+  }
+
+  // Get message text
+  const text = String(data.message || '').trim();
+
+  // Ignore empty messages
+  if (!text) {
+    return;
+  }
+
+  // Limit message length
+  if (text.length > 500) {
+    ws.send(JSON.stringify({
+      type: 'CHAT_ERROR',
+      message: 'Message is too long. Maximum 500 characters.'
+    }));
+    return;
+  }
+
+  // Create the chat message
+  const chatMessage = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    userName: ws.userName || 'User',
+    message: text,
+    sentAt: new Date().toISOString()
+  };
+
+  // Save message in Business room history
+  addBusinessChatMessage(ws.roomId, chatMessage);
+
+  // Send message to everyone in this Business room
+  broadcastBusinessChat(ws.roomId, {
+    type: 'CHAT_MESSAGE',
+    message: chatMessage
+  });
+}
 
       if (data.type === 'SET_SOS_MODE') {
         if (ws.roomId && ws.userRole && ws.userRole.toLowerCase() === 'admin') {
@@ -794,22 +1663,54 @@ wss.on('connection', (ws) => {
       }
 
       if (data.type === 'LOCATION_UPDATE') {
-        const roomSockets = activeRoomSockets.get(ws.roomId);
-        if (roomSockets) {
-          const payload = JSON.stringify({
-            type: 'LOCATION_BROADCAST',
-            userName: ws.userName,
-            location: data.location
-          });
-          
-          for (const client of roomSockets) {
-            if (client.readyState === WebSocket.OPEN && client.userRole && client.userRole.toLowerCase() === 'admin') {
-              client.send(payload);
-            }
-          }
-        }
-      }
+  if (!ws.roomId || !ws.userName) {
+    return;
+  }
 
+  const location = data.location;
+
+  if (
+    !location ||
+    typeof location !== 'object' ||
+    typeof location.latitude !== 'number' ||
+    typeof location.longitude !== 'number' ||
+    !Number.isFinite(location.latitude) ||
+    !Number.isFinite(location.longitude) ||
+    location.latitude < -90 ||
+    location.latitude > 90 ||
+    location.longitude < -180 ||
+    location.longitude > 180
+  ) {
+    ws.send(JSON.stringify({
+      type: 'LOCATION_ERROR',
+      message: 'Invalid location data.'
+    }));
+    return;
+  }
+
+  const roomSockets = activeRoomSockets.get(ws.roomId);
+
+  if (roomSockets) {
+    const payload = JSON.stringify({
+      type: 'LOCATION_BROADCAST',
+      userName: ws.userName,
+      location: {
+        latitude: location.latitude,
+        longitude: location.longitude
+      }
+    });
+
+    for (const client of roomSockets) {
+      if (
+        client.readyState === WebSocket.OPEN &&
+        client.userRole &&
+        client.userRole.toLowerCase() === 'admin'
+      ) {
+        client.send(payload);
+      }
+    }
+  }
+}
       if (data.type === 'START_TALKING' || data.type === 'STOP_TALKING') {
         const roomSockets = activeRoomSockets.get(ws.roomId);
         if (roomSockets) {
@@ -869,6 +1770,33 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('close', () => {
+
+    // ============================================================
+  // BUSINESS VIDEO â€” CLEANUP ON WEBSOCKET DISCONNECT
+  // ============================================================
+  if (
+    ws.videoConferenceActive &&
+    ws.roomId &&
+    activeRoomSockets.has(ws.roomId)
+  ) {
+    const videoRoomSockets = activeRoomSockets.get(ws.roomId);
+
+    for (const client of videoRoomSockets) {
+      if (
+        client !== ws &&
+        client.readyState === WebSocket.OPEN &&
+        client.videoConferenceActive === true
+      ) {
+        client.send(JSON.stringify({
+          type: 'VIDEO_PEER_LEFT',
+          peerId: ws.videoPeerId
+        }));
+      }
+    }
+
+    ws.videoConferenceActive = false;
+  }
+
     if (ws.roomId && activeRoomSockets.has(ws.roomId)) {
       const roomSockets = activeRoomSockets.get(ws.roomId);
       roomSockets.delete(ws);
@@ -895,8 +1823,10 @@ app.get('/room.html', (req, res) => {
 });
 
 
-
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running at http://0.0.0.0:${PORT}`);
 });
+
+
+
 

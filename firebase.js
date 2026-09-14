@@ -17,4 +17,7 @@ const analytics = getAnalytics(app);
 
 const auth = getAuth(app);
 
+window.firebaseAuth = auth;
+window.firebaseApp = app;
+
 export { app, auth };

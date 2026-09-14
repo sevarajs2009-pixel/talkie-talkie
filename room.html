@@ -323,6 +323,28 @@
       </div>
     </section>
 
+        <!-- Business Collaboration Tools -->
+    <section id="business-tools-section" class="hidden">
+      <button
+        onclick="toggleBusinessChat()"
+        class="w-full h-12 rounded-xl bg-blue-600/15 hover:bg-blue-600/25 text-blue-400 border border-blue-500/30 flex items-center justify-center gap-2 transition-all font-bold text-xs active:scale-95"
+      >
+        <span class="material-symbols-outlined text-[20px]">chat</span>
+        Business Chat
+      </button>
+    </section>
+
+    <!-- Business Video Conference -->
+<section id="business-video-section" class="hidden mt-3">
+  <button
+    onclick="toggleBusinessVideo()"
+    class="w-full h-12 rounded-xl bg-blue-600/15 hover:bg-blue-600/25 text-blue-400 border border-blue-500/30 flex items-center justify-center gap-2 transition-all font-bold text-xs active:scale-95"
+  >
+    <span class="material-symbols-outlined text-[20px]">videocam</span>
+    Video Conference
+  </button>
+</section>
+
     <!-- Interactive PTT Section -->
     <section class="py-4 flex flex-col items-center justify-center relative my-auto icon-3d-wrapper">
       <div class="relative flex items-center justify-center">
@@ -350,7 +372,180 @@
   </main>
 
   <!-- GPS Map Modal -->
+  <!-- Business Chat Modal -->
+<div
+  id="business-chat-modal"
+  class="hidden fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm items-center justify-center p-4"
+>
+  <div
+    class="w-full max-w-md h-[75vh] max-h-[650px] bg-dark-900 border border-dark-border rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+  >
+
+    <!-- Chat Header -->
+    <div class="h-14 px-4 flex items-center justify-between border-b border-dark-border bg-dark-800">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-blue-600/20 flex items-center justify-center">
+          <span class="material-symbols-outlined text-blue-400">
+            chat
+          </span>
+        </div>
+
+        <div>
+          <div class="text-sm font-bold text-white">
+            Business Chat
+          </div>
+
+          <div class="text-[10px] text-slate-400">
+            <span id="business-chat-room-name">
+              Business Room
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <button
+        onclick="toggleBusinessChat(false)"
+        class="w-9 h-9 rounded-xl hover:bg-dark-700 flex items-center justify-center text-slate-400 hover:text-white transition-colors"
+      >
+        <span class="material-symbols-outlined">
+          close
+        </span>
+      </button>
+    </div>
+
+    <!-- Messages -->
+    <div
+      id="business-chat-messages"
+      class="flex-1 overflow-y-auto p-4 space-y-3"
+    >
+      <div class="text-center text-xs text-slate-500 py-10">
+        No messages yet.
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div class="p-3 border-t border-dark-border bg-dark-800">
+
+      <div class="flex items-end gap-2">
+
+        <textarea
+          id="business-chat-input"
+          rows="1"
+          maxlength="500"
+          placeholder="Type a message..."
+          onkeydown="handleBusinessChatKeydown(event)"
+          class="flex-1 resize-none bg-dark-900 border border-dark-border rounded-xl px-3 py-3 text-sm text-white placeholder-slate-500 outline-none focus:border-blue-500"
+        ></textarea>
+
+        <button
+          onclick="sendBusinessChatMessage()"
+          class="w-11 h-11 shrink-0 rounded-xl bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center transition-all active:scale-95"
+        >
+          <span class="material-symbols-outlined text-[20px]">
+            send
+          </span>
+        </button>
+
+      </div>
+
+      <div class="text-[9px] text-slate-500 mt-1 px-1">
+        Maximum 500 characters
+      </div>
+
+    </div>
+
+  </div>
+</div>  
+
+  <!-- Business Video Conference Modal -->
+<div
+  id="business-video-modal"
+  class="hidden fixed inset-0 z-[100] bg-black/90 flex flex-col"
+>
+  <!-- Header -->
+  <div class="h-14 px-4 flex items-center justify-between border-b border-white/10 bg-black/60">
+
+    <div class="flex items-center gap-2">
+      <span class="material-symbols-outlined text-blue-400">
+        videocam
+      </span>
+
+      <div>
+        <div class="text-sm font-bold text-white">
+          Video Conference
+        </div>
+
+        <div class="text-[10px] text-slate-400">
+          Business Room
+        </div>
+      </div>
+    </div>
+
+    <!-- Close Button -->
+    <button
+      onclick="toggleBusinessVideo(false)"
+      class="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/15 text-white flex items-center justify-center"
+    >
+      <span class="material-symbols-outlined text-lg">
+        close
+      </span>
+    </button>
+
+  </div>
+
+  <!-- Video Area -->
+  <div
+    id="business-video-grid"
+    class="flex-1 p-3 grid grid-cols-1 sm:grid-cols-2 gap-3 overflow-auto"
+  >
+
+    <!-- Video tiles will be added here later -->
+
+  </div>
+
+  <!-- Bottom Controls -->
+  <div
+    class="h-20 px-4 flex items-center justify-center gap-3 border-t border-white/10 bg-black/70"
+  >
+
+    <!-- Microphone -->
+    <button
+      id="business-video-mic-btn"
+      onclick="toggleBusinessVideoMic()"
+      class="w-12 h-12 rounded-full bg-white/10 hover:bg-white/15 text-white flex items-center justify-center"
+    >
+      <span class="material-symbols-outlined">
+        mic
+      </span>
+    </button>
+
+    <!-- Camera -->
+    <button
+      id="business-video-camera-btn"
+      onclick="toggleBusinessVideoCamera()"
+      class="w-12 h-12 rounded-full bg-white/10 hover:bg-white/15 text-white flex items-center justify-center"
+    >
+      <span class="material-symbols-outlined">
+        videocam
+      </span>
+    </button>
+
+    <!-- Leave Conference -->
+    <button
+      onclick="toggleBusinessVideo(false)"
+      class="w-12 h-12 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center"
+    >
+      <span class="material-symbols-outlined">
+        call_end
+      </span>
+    </button>
+
+  </div>
+
+</div>
+
   <div id="map-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4">
+    
     <div class="bg-surface-card border border-surface-border w-full max-w-sm rounded-3xl p-5 shadow-2xl flex flex-col gap-4 relative">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2.5">
@@ -372,6 +567,14 @@
       </div>
     </div>
   </div>
+  <script type="module">
+
+  import { auth, app } from "./firebase.js";
+  
+
+  window.firebaseAuth = auth;
+  window.firebaseApp = app;
+</script>
 
   <script>
     const urlParams = new URLSearchParams(window.location.search);
@@ -382,6 +585,7 @@
     const userName = urlParams.get('userName') || urlParams.get('adminUsername') || 'Administrator';
 
     let ws = null;
+    let businessChatMessages = [];
     let audioStream = null;
     let audioContext = null;
     let scriptProcessor = null;
@@ -544,6 +748,172 @@
       body.classList.add(patternType === 'grid' ? 'bg-pattern-grid' : 'bg-pattern-radial');
     }
 
+    // ============================================================
+// BUSINESS CHAT — OPEN / CLOSE
+// ============================================================
+
+function toggleBusinessChat(forceState = null) {
+  // Family rooms can never open Business Chat
+  if (roomType !== 'business') {
+    return;
+  }
+
+  const modal = document.getElementById('business-chat-modal');
+
+  if (!modal) {
+    return;
+  }
+
+  const shouldOpen =
+    forceState === null
+      ? modal.classList.contains('hidden')
+      : forceState;
+
+  if (shouldOpen) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+
+    const roomNameElement = document.getElementById('business-chat-room-name');
+
+    if (roomNameElement) {
+      roomNameElement.textContent = roomName || 'Business Room';
+    }
+
+    renderBusinessChat();
+
+    setTimeout(() => {
+      document.getElementById('business-chat-input')?.focus();
+    }, 100);
+  } else {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+}
+// ============================================================
+// BUSINESS CHAT — SEND MESSAGE
+// ============================================================
+
+function sendBusinessChatMessage() {
+  // Business rooms only
+  if (roomType !== 'business') {
+    return;
+  }
+
+  // WebSocket must be connected
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    alert('Chat is not connected yet.');
+    return;
+  }
+
+  const input = document.getElementById('business-chat-input');
+
+  if (!input) {
+    return;
+  }
+
+  const message = input.value.trim();
+
+  // Don't send empty messages
+  if (!message) {
+    return;
+  }
+
+  // Maximum 500 characters
+  if (message.length > 500) {
+    alert('Message is too long. Maximum 500 characters.');
+    return;
+  }
+
+  // Send to server
+  ws.send(JSON.stringify({
+    type: 'CHAT_SEND',
+    message: message
+  }));
+
+  // Clear input
+  input.value = '';
+}
+
+// ============================================================
+// BUSINESS CHAT — ENTER KEY
+// ============================================================
+
+function handleBusinessChatKeydown(event) {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    sendBusinessChatMessage();
+  }
+}
+
+// ============================================================
+// BUSINESS CHAT — RENDER MESSAGES
+// ============================================================
+
+function renderBusinessChat() {
+  const container = document.getElementById('business-chat-messages');
+
+  if (!container) {
+    return;
+  }
+
+  if (businessChatMessages.length === 0) {
+    container.innerHTML = `
+      <div class="text-center text-xs text-slate-500 py-10">
+        No messages yet.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = businessChatMessages.map((item) => {
+    const isMine = item.userName === userName;
+
+    return `
+      <div class="flex ${isMine ? 'justify-end' : 'justify-start'}">
+        <div class="max-w-[80%]">
+
+          <div class="text-[9px] text-slate-500 mb-1 px-1 ${isMine ? 'text-right' : ''}">
+            ${escapeChatHtml(item.userName || 'User')}
+          </div>
+
+          <div class="px-3 py-2 rounded-2xl ${
+            isMine
+              ? 'bg-blue-600 text-white rounded-br-md'
+              : 'bg-dark-700 text-slate-200 rounded-bl-md'
+          }">
+            <div class="text-xs break-words">
+              ${escapeChatHtml(item.message || '')}
+            </div>
+          </div>
+
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  scrollBusinessChatToBottom();
+}
+
+// ============================================================
+// BUSINESS CHAT — HELPER FUNCTIONS
+// ============================================================
+
+function escapeChatHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = String(text ?? '');
+  return div.innerHTML;
+}
+
+function scrollBusinessChatToBottom() {
+  const container = document.getElementById('business-chat-messages');
+
+  if (!container) {
+    return;
+  }
+
+  container.scrollTop = container.scrollHeight;
+}
+
     function updateRoomTypeUI() {
       const typeBadge = document.getElementById('header-room-type-badge');
       const typeIcon = document.getElementById('room-type-icon');
@@ -555,12 +925,16 @@
         securityText.textContent = 'Encrypted Stream';
         setAccentTheme('blue');
         setBackgroundPattern('grid');
+        document.getElementById('business-tools-section').classList.remove('hidden');
+        document.getElementById('business-video-section').classList.remove('hidden');
       } else {
         typeBadge.textContent = 'FAMILY';
         typeIcon.textContent = 'family_restroom';
         securityText.textContent = 'GPS Tracking Active';
         setAccentTheme('emerald');
         setBackgroundPattern('radial');
+        document.getElementById('business-tools-section').classList.add('hidden');
+        document.getElementById('business-video-section').classList.add('hidden');
       }
 
       if (role.toLowerCase() === 'admin') {
@@ -571,6 +945,790 @@
         document.getElementById('guest-mute-sos-btn').classList.add('flex');
       }
     }
+
+
+    // ============================================================
+// BUSINESS VIDEO CONFERENCE — WEBRTC
+// ============================================================
+
+let businessVideoStream = null;
+let businessVideoPeers = new Map();
+
+let businessVideoMicOn = true;
+let businessVideoCameraOn = true;
+
+
+// ============================================================
+// OPEN / CLOSE VIDEO CONFERENCE
+// ============================================================
+
+async function toggleBusinessVideo(forceState = null) {
+  if (roomType !== 'business') {
+    alert('Video Conference is available only in Business rooms.');
+    return;
+  }
+
+  const modal = document.getElementById('business-video-modal');
+
+  if (!modal) {
+    console.error('business-video-modal not found.');
+    return;
+  }
+
+  const isCurrentlyOpen = !modal.classList.contains('hidden');
+
+  const shouldOpen =
+    forceState === true ||
+    (forceState === null && !isCurrentlyOpen);
+
+  if (shouldOpen) {
+    modal.classList.remove('hidden');
+
+    await startBusinessVideoConference();
+
+  } else {
+    await stopBusinessVideoConference();
+
+    modal.classList.add('hidden');
+  }
+}
+
+
+// ============================================================
+// START VIDEO CONFERENCE
+// ============================================================
+
+async function startBusinessVideoConference() {
+  if (roomType !== 'business') {
+    return;
+  }
+
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    alert('Room connection is not ready yet.');
+    return;
+  }
+
+  try {
+
+    // Get camera + microphone
+    businessVideoStream =
+      await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+      });
+
+    businessVideoMicOn = true;
+    businessVideoCameraOn = true;
+
+    // Create local video
+    createBusinessVideoTile(
+      'local',
+      userName,
+      businessVideoStream,
+      true
+    );
+
+    updateBusinessVideoControls();
+
+    // Tell server we joined video conference
+    ws.send(JSON.stringify({
+      type: 'VIDEO_JOIN',
+      roomId
+    }));
+
+    console.log('VIDEO CONFERENCE STARTED');
+
+  } catch (error) {
+
+    console.error(
+      'Business video conference error:',
+      error
+    );
+
+    alert(
+      'Camera and microphone permission are required for Video Conference.'
+    );
+  }
+}
+
+
+// ============================================================
+// CREATE VIDEO TILE
+// ============================================================
+
+function createBusinessVideoTile(
+  peerId,
+  participantName,
+  stream,
+  isLocal = false
+) {
+
+  const grid =
+    document.getElementById('business-video-grid');
+
+  if (!grid) {
+    return;
+  }
+
+  // Don't create duplicate tile
+  if (
+    document.getElementById(
+      `video-tile-${peerId}`
+    )
+  ) {
+    return;
+  }
+
+  const tile = document.createElement('div');
+
+  tile.id = `video-tile-${peerId}`;
+
+  tile.className =
+    'relative bg-slate-900 rounded-2xl overflow-hidden border border-white/10 min-h-[220px] shadow-xl';
+
+  const video = document.createElement('video');
+
+  video.id =
+    `video-element-${peerId}`;
+
+  video.className =
+    'w-full h-full min-h-[220px] object-cover bg-black';
+
+  video.autoplay = true;
+  video.playsInline = true;
+
+  if (isLocal) {
+    video.muted = true;
+  }
+
+  video.srcObject = stream;
+
+  const nameBadge =
+    document.createElement('div');
+
+  nameBadge.className =
+    'absolute bottom-3 left-3 px-3 py-1.5 rounded-xl bg-black/70 backdrop-blur-md text-white text-xs font-bold border border-white/10';
+
+  nameBadge.textContent =
+    isLocal
+      ? `${participantName} (You)`
+      : participantName;
+
+  tile.appendChild(video);
+  tile.appendChild(nameBadge);
+
+  grid.appendChild(tile);
+
+  video.play().catch(() => {});
+}
+
+
+// ============================================================
+// CREATE WEBRTC PEER
+// ============================================================
+
+async function createBusinessVideoPeer(
+  peerId,
+  participantName,
+  createOffer
+) {
+
+  if (!businessVideoStream) {
+    return;
+  }
+
+  // Already connected
+  if (businessVideoPeers.has(peerId)) {
+    return;
+  }
+
+  console.log(
+    'Creating video peer:',
+    peerId,
+    participantName,
+    'offer:',
+    createOffer
+  );
+
+  const peerConnection =
+    new RTCPeerConnection({
+
+      iceServers: [
+        {
+          urls: 'stun:stun.l.google.com:19302'
+        }
+      ]
+
+    });
+
+
+  // Save peer
+  businessVideoPeers.set(
+    peerId,
+    {
+      connection: peerConnection,
+      userName: participantName,
+      pendingCandidates: []
+    }
+  );
+
+
+  // Add local camera + microphone
+  businessVideoStream
+    .getTracks()
+    .forEach(track => {
+
+      peerConnection.addTrack(
+        track,
+        businessVideoStream
+      );
+
+    });
+
+
+  // Receive remote stream
+  peerConnection.ontrack = (event) => {
+
+    console.log(
+      'Remote video received:',
+      participantName
+    );
+
+    const remoteStream =
+      event.streams[0];
+
+    if (!remoteStream) {
+      return;
+    }
+
+    createBusinessVideoTile(
+      peerId,
+      participantName,
+      remoteStream,
+      false
+    );
+  };
+
+
+  // ICE candidate
+  peerConnection.onicecandidate = (event) => {
+
+    if (!event.candidate) {
+      return;
+    }
+
+    if (
+      !ws ||
+      ws.readyState !== WebSocket.OPEN
+    ) {
+      return;
+    }
+
+    ws.send(JSON.stringify({
+
+      type: 'VIDEO_ICE',
+
+      targetPeerId: peerId,
+
+      candidate: event.candidate
+
+    }));
+
+  };
+
+
+  peerConnection.onconnectionstatechange = () => {
+
+    console.log(
+      'Video connection:',
+      participantName,
+      peerConnection.connectionState
+    );
+
+    if (
+      peerConnection.connectionState ===
+        'failed' ||
+      peerConnection.connectionState ===
+        'closed' ||
+      peerConnection.connectionState ===
+        'disconnected'
+    ) {
+
+      removeBusinessVideoPeer(
+        peerId
+      );
+
+    }
+
+  };
+
+
+  // Existing participant creates offer
+  if (createOffer) {
+
+    try {
+
+      const offer =
+        await peerConnection.createOffer();
+
+      await peerConnection.setLocalDescription(
+        offer
+      );
+
+      ws.send(JSON.stringify({
+
+        type: 'VIDEO_OFFER',
+
+        targetPeerId: peerId,
+
+        offer: peerConnection.localDescription
+
+      }));
+
+    } catch (error) {
+
+      console.error(
+        'Video offer error:',
+        error
+      );
+
+    }
+
+  }
+
+}
+
+
+// ============================================================
+// HANDLE VIDEO OFFER
+// ============================================================
+
+async function handleBusinessVideoOffer(data) {
+
+  if (!data.fromPeerId) {
+    return;
+  }
+
+  const peerData =
+    businessVideoPeers.get(
+      data.fromPeerId
+    );
+
+  if (!peerData) {
+
+    await createBusinessVideoPeer(
+      data.fromPeerId,
+      data.fromUserName || 'Participant',
+      false
+    );
+
+  }
+
+  const currentPeer =
+    businessVideoPeers.get(
+      data.fromPeerId
+    );
+
+  if (!currentPeer) {
+    return;
+  }
+
+  try {
+
+    await currentPeer.connection.setRemoteDescription(
+      new RTCSessionDescription(
+        data.offer
+      )
+    );
+
+
+    // Add any ICE candidates
+    // that arrived early
+    for (
+      const candidate
+      of currentPeer.pendingCandidates
+    ) {
+
+      await currentPeer.connection.addIceCandidate(
+        candidate
+      );
+
+    }
+
+    currentPeer.pendingCandidates = [];
+
+
+    const answer =
+      await currentPeer.connection.createAnswer();
+
+    await currentPeer.connection.setLocalDescription(
+      answer
+    );
+
+
+    ws.send(JSON.stringify({
+
+      type: 'VIDEO_ANSWER',
+
+      targetPeerId:
+        data.fromPeerId,
+
+      answer:
+        currentPeer.connection.localDescription
+
+    }));
+
+  } catch (error) {
+
+    console.error(
+      'Video offer handling error:',
+      error
+    );
+
+  }
+
+}
+
+
+// ============================================================
+// HANDLE VIDEO ANSWER
+// ============================================================
+
+async function handleBusinessVideoAnswer(data) {
+
+  const peerData =
+    businessVideoPeers.get(
+      data.fromPeerId
+    );
+
+  if (!peerData) {
+    return;
+  }
+
+  try {
+
+    await peerData.connection.setRemoteDescription(
+      new RTCSessionDescription(
+        data.answer
+      )
+    );
+
+
+    for (
+      const candidate
+      of peerData.pendingCandidates
+    ) {
+
+      await peerData.connection.addIceCandidate(
+        candidate
+      );
+
+    }
+
+    peerData.pendingCandidates = [];
+
+  } catch (error) {
+
+    console.error(
+      'Video answer error:',
+      error
+    );
+
+  }
+
+}
+
+
+// ============================================================
+// HANDLE VIDEO ICE
+// ============================================================
+
+async function handleBusinessVideoIce(data) {
+
+  const peerData =
+    businessVideoPeers.get(
+      data.fromPeerId
+    );
+
+  if (!peerData) {
+    return;
+  }
+
+  if (!data.candidate) {
+    return;
+  }
+
+  const candidate =
+    new RTCIceCandidate(
+      data.candidate
+    );
+
+
+  // Remote description not ready yet
+  if (
+    !peerData.connection.remoteDescription
+  ) {
+
+    peerData.pendingCandidates.push(
+      candidate
+    );
+
+    return;
+  }
+
+
+  try {
+
+    await peerData.connection.addIceCandidate(
+      candidate
+    );
+
+  } catch (error) {
+
+    console.error(
+      'ICE candidate error:',
+      error
+    );
+
+  }
+
+}
+
+
+// ============================================================
+// REMOVE VIDEO PEER
+// ============================================================
+
+function removeBusinessVideoPeer(
+  peerId
+) {
+
+  const peerData =
+    businessVideoPeers.get(
+      peerId
+    );
+
+  if (peerData) {
+
+    try {
+      peerData.connection.close();
+    } catch (error) {}
+
+  }
+
+  businessVideoPeers.delete(
+    peerId
+  );
+
+
+  const tile =
+    document.getElementById(
+      `video-tile-${peerId}`
+    );
+
+  if (tile) {
+    tile.remove();
+  }
+
+}
+
+
+// ============================================================
+// STOP VIDEO CONFERENCE
+// ============================================================
+
+async function stopBusinessVideoConference() {
+
+  if (ws && ws.readyState === WebSocket.OPEN) {
+
+    ws.send(JSON.stringify({
+      type: 'VIDEO_LEAVE',
+      roomId
+    }));
+
+  }
+
+
+  // Close all peer connections
+  for (
+    const [
+      peerId,
+      peerData
+    ]
+    of businessVideoPeers
+  ) {
+
+    try {
+      peerData.connection.close();
+    } catch (error) {}
+
+  }
+
+  businessVideoPeers.clear();
+
+
+  // Stop camera + microphone
+  if (businessVideoStream) {
+
+    businessVideoStream
+      .getTracks()
+      .forEach(track => track.stop());
+
+    businessVideoStream = null;
+
+  }
+
+
+  // Clear video tiles
+  const grid =
+    document.getElementById(
+      'business-video-grid'
+    );
+
+  if (grid) {
+    grid.innerHTML = '';
+  }
+
+
+  businessVideoMicOn = true;
+  businessVideoCameraOn = true;
+
+  updateBusinessVideoControls();
+
+  console.log(
+    'VIDEO CONFERENCE STOPPED'
+  );
+
+}
+
+
+// ============================================================
+// MICROPHONE TOGGLE
+// ============================================================
+
+function toggleBusinessVideoMic() {
+
+  if (!businessVideoStream) {
+    return;
+  }
+
+  businessVideoMicOn =
+    !businessVideoMicOn;
+
+
+  businessVideoStream
+    .getAudioTracks()
+    .forEach(track => {
+
+      track.enabled =
+        businessVideoMicOn;
+
+    });
+
+
+  updateBusinessVideoControls();
+
+}
+
+
+// ============================================================
+// CAMERA TOGGLE
+// ============================================================
+
+function toggleBusinessVideoCamera() {
+
+  if (!businessVideoStream) {
+    return;
+  }
+
+  businessVideoCameraOn =
+    !businessVideoCameraOn;
+
+
+  businessVideoStream
+    .getVideoTracks()
+    .forEach(track => {
+
+      track.enabled =
+        businessVideoCameraOn;
+
+    });
+
+
+  updateBusinessVideoControls();
+
+}
+
+
+// ============================================================
+// UPDATE VIDEO CONTROLS
+// ============================================================
+
+function updateBusinessVideoControls() {
+
+  const micButton =
+    document.getElementById(
+      'business-video-mic-btn'
+    );
+
+  const cameraButton =
+    document.getElementById(
+      'business-video-camera-btn'
+    );
+
+
+  if (micButton) {
+
+    const icon =
+      micButton.querySelector(
+        '.material-symbols-outlined'
+      );
+
+    if (icon) {
+
+      icon.textContent =
+        businessVideoMicOn
+          ? 'mic'
+          : 'mic_off';
+
+    }
+
+    micButton.className =
+      businessVideoMicOn
+
+        ? 'w-12 h-12 rounded-full bg-white/10 hover:bg-white/15 text-white flex items-center justify-center'
+
+        : 'w-12 h-12 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center';
+
+  }
+
+
+  if (cameraButton) {
+
+    const icon =
+      cameraButton.querySelector(
+        '.material-symbols-outlined'
+      );
+
+    if (icon) {
+
+      icon.textContent =
+        businessVideoCameraOn
+          ? 'videocam'
+          : 'videocam_off';
+
+    }
+
+    cameraButton.className =
+      businessVideoCameraOn
+
+        ? 'w-12 h-12 rounded-full bg-white/10 hover:bg-white/15 text-white flex items-center justify-center'
+
+        : 'w-12 h-12 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center';
+
+  }
+
+}
 
     document.getElementById('header-room-name').textContent = roomName;
     document.getElementById('current-user-name').textContent = userName;
@@ -599,7 +1757,7 @@
                 type: 'LOCATION_UPDATE',
                 roomId,
                 userName,
-                location: { lat: latitude, lng: longitude }
+                location: { latitude, longitude }
               }));
             }
           },
@@ -611,8 +1769,25 @@
 
     async function initRoomConnection() {
       try {
-        const protocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
-        ws = new WebSocket(`${protocol}${location.host}/ws/room`);
+  const protocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
+
+  const { auth } = await import("./firebase.js");
+
+await auth.authStateReady();
+
+const firebaseUser = auth.currentUser;
+
+if (!firebaseUser) {
+  alert('You must be logged in to enter the room.');
+  window.location.href = 'login.html';
+  return;
+}
+
+const idToken = await firebaseUser.getIdToken();
+
+  ws = new WebSocket(
+    `${protocol}${location.host}/ws/room?token=${encodeURIComponent(idToken)}`
+  );
 
         ws.onopen = () => {
           document.getElementById('connection-status').textContent = 'Connected';
@@ -828,8 +2003,73 @@
           const targetRadio = document.querySelector(`input[name="sosModeRadio"][value="${sosMode}"]`);
           if (targetRadio) targetRadio.checked = true;
           break;
-      }
-    }
+
+      // ============================================================
+// BUSINESS CHAT
+// ============================================================
+
+case 'CHAT_HISTORY':
+  businessChatMessages = Array.isArray(data.messages)
+    ? data.messages
+    : [];
+
+  renderBusinessChat();
+  break;
+
+case 'CHAT_MESSAGE':
+  if (data.message) {
+    businessChatMessages.push(data.message);
+  }
+
+  renderBusinessChat();
+  break;
+
+case 'CHAT_ERROR':
+  alert(data.message || 'Business chat error.');
+  break;
+
+  // ============================================================
+// BUSINESS VIDEO — WEBRTC SIGNALING
+// ============================================================
+
+case 'VIDEO_EXISTING_PEER':
+    createBusinessVideoPeer(
+        data.peerId,
+        data.userName,
+        false
+    );
+    break;
+
+case 'VIDEO_PEER_JOINED':
+    createBusinessVideoPeer(
+        data.peerId,
+        data.userName,
+        true
+    );
+    break;
+
+case 'VIDEO_OFFER':
+    handleBusinessVideoOffer(data);
+    break;
+
+case 'VIDEO_ANSWER':
+    handleBusinessVideoAnswer(data);
+    break;
+
+case 'VIDEO_ICE':
+    handleBusinessVideoIce(data);
+    break;
+
+case 'VIDEO_PEER_LEFT':
+    removeBusinessVideoPeer(data.peerId);
+    break;
+
+case 'VIDEO_ERROR':
+    alert(data.message || 'Video Conference error.');
+    break;
+}
+}
+    
 
     function renderUserBannerOffButton() {
       const container = document.getElementById('banner-off-btn-container');
@@ -902,12 +2142,16 @@
       const loc = memberLocations[targetUserName];
 
       if (!leafletMap) {
-        leafletMap = L.map('map').setView([loc ? loc.lat : 0, loc ? loc.lng : 0], 15);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19,
-          attribution: '&copy; OpenStreetMap'
-        }).addTo(leafletMap);
-      }
+  const initialLat = loc?.latitude ?? 0;
+  const initialLng = loc?.longitude ?? 0;
+
+  leafletMap = L.map('map').setView([initialLat, initialLng], 15);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap'
+  }).addTo(leafletMap);
+}
 
       setTimeout(() => {
         leafletMap.invalidateSize();
@@ -922,7 +2166,7 @@
     function updateMapPosition(targetUserName, loc) {
       if (!leafletMap || !loc || roomType === 'business') return;
       
-      const latLng = [loc.lat, loc.lng];
+      const latLng = [loc.latitude, loc.longitude];
       leafletMap.setView(latLng, 15);
 
       if (mapMarker) {
@@ -931,8 +2175,8 @@
         mapMarker = L.marker(latLng).addTo(leafletMap);
       }
 
-      mapMarker.bindPopup(`<b>${targetUserName}</b><br>Lat: ${loc.lat.toFixed(4)}, Lng: ${loc.lng.toFixed(4)}`).openPopup();
-      document.getElementById('map-coords-info').textContent = `Latitude: ${loc.lat.toFixed(5)}, Longitude: ${loc.lng.toFixed(5)}`;
+      mapMarker.bindPopup(`<b>${targetUserName}</b><br>Lat: ${loc.latitude.toFixed(4)}, Lng: ${loc.longitude.toFixed(4)}`).openPopup();
+      document.getElementById('map-coords-info').textContent = `Latitude: ${loc.latitude.toFixed(5)}, Longitude: ${loc.longitude.toFixed(5)}`;
     }
 
     function closeMapModal() {
@@ -1039,7 +2283,7 @@
       alert(`Room: ${roomName}\nType: ${roomType.toUpperCase()}\nRole: ${role}\nUser: ${userName}`);
     }
 
-    initRoomConnection();
+    window.addEventListener('DOMContentLoaded', initRoomConnection);
   </script>
 </body>
 </html>
