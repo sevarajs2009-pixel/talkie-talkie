@@ -746,6 +746,11 @@ await window.firebaseSetDoc(
         setTimeout(() => {
           const targetRoom = managedRooms.find(r => r.name.trim().toLowerCase() === adminGatewayData.roomId.trim().toLowerCase() || r.roomId.trim().toLowerCase() === adminGatewayData.roomId.trim().toLowerCase());
 
+          console.log("ADMIN GATEWAY DEBUG - entered room:", adminGatewayData.roomId);
+console.log("ADMIN GATEWAY DEBUG - entered passcode:", adminGatewayData.secureKey);
+console.log("ADMIN GATEWAY DEBUG - target room:", targetRoom);
+console.log("ADMIN GATEWAY DEBUG - stored secureKey:", targetRoom?.secureKey);
+
           if (!targetRoom) {
             setAdminGatewayStatus('Error: ROOM NAME not found in directory.');
             return;

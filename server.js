@@ -978,6 +978,8 @@ app.post('/api/rooms/join', (req, res) => {
 });
 // Firebase Secure Room Verification Endpoint
 app.post('/api/rooms/verify', async (req, res) => {
+  console.log("ROOM VERIFY REQUEST RECEIVED");
+console.log("Authorization header exists:", !!req.headers.authorization);
   try {
     const authHeader = req.headers.authorization || '';
 
@@ -991,8 +993,21 @@ app.post('/api/rooms/verify', async (req, res) => {
     const idToken = authHeader.substring(7);
 
     // Verify the logged-in Firebase user
-    const decodedToken = await firebaseAuth.verifyIdToken(idToken);
-    const guestUid = decodedToken.uid;
+    let decodedToken;
+
+try {
+  decodedToken = await firebaseAuth.verifyIdToken(idToken);
+} catch (tokenError) {
+  console.error("ROOM VERIFY TOKEN ERROR:", tokenError);
+
+  return res.status(401).json({
+    success: false,
+    message: "Firebase authentication failed.",
+    error: tokenError.code || tokenError.message
+  });
+}
+
+const guestUid = decodedToken.uid;
 
     const { roomId, roomName, secureKey } = req.body;
 
