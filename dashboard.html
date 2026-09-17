@@ -1151,12 +1151,6 @@ const handleGuestJoin = async (e) => {
                                   <span className="text-xs text-slate-400 font-mono">Type: {room.type || 'General'}</span>
                                 </div>
                               </div>
-                              <button 
-                                onClick={() => openMemberManager(room)}
-                                className="bg-brand-500/10 hover:bg-brand-500/20 text-brand-400 border border-brand-500/20 px-2.5 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
-                              >
-                                <span className="material-symbols-outlined text-[13px]">group</span> {room.members || 1} Members
-                              </button>
                             </div>
                             <div className="flex flex-col gap-1 text-[11px] text-slate-400 bg-dark-900/50 p-2.5 rounded-xl border border-dark-border">
                               <div className="flex justify-between"><span>Host Creator:</span> <strong className="text-slate-300">{room.userName}</strong></div>
