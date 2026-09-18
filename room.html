@@ -1786,7 +1786,7 @@ if (!firebaseUser) {
 const idToken = await firebaseUser.getIdToken();
 
   ws = new WebSocket(
-    `${protocol}${location.host}/ws/room?token=${encodeURIComponent(idToken)}`
+    `${protocol}talkie-talkie-server.onrender.com/ws/room?token=${encodeURIComponent(idToken)}`
   );
 
         ws.onopen = () => {
