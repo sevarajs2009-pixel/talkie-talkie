@@ -221,7 +221,7 @@ setProfileData((prev) => ({
           const idToken = await user.getIdToken();
           setCopyToast('Creating secure payment order...');
 
-          const orderResponse = await fetch('/api/payment/create-order', {
+          const orderResponse = await fetch('https://talkie-talkie-server.onrender.com/api/payment/create-order', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -252,7 +252,7 @@ setProfileData((prev) => ({
               try {
                 setCopyToast('Verifying payment...');
 
-                const verifyResponse = await fetch('/api/payment/verify', {
+                const verifyResponse = await fetch('https://talkie-talkie-server.onrender.com/api/payment/verify', {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
