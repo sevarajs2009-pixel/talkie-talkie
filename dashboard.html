@@ -790,7 +790,7 @@ const handleGuestJoin = async (e) => {
     const idToken = await user.getIdToken();
 
     // Send Room ID + passcode to the secure Node.js endpoint
-    const response = await fetch("/api/rooms/verify", {
+    const response = await fetch("https://talkie-talkie-server.onrender.com/api/rooms/verify", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
