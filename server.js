@@ -451,8 +451,10 @@ function broadcastBusinessChat(roomId, payload) {
 }
 const roomSettings = new Map();
 
-// Temporary OTP store for signup testing
-const signupOtps = new Map();
+
+// Persistent OTP storage is handled in Firestore.
+// Collection: signupOtps/{normalizedEmail}
+
 // Firebase users who successfully verified a private room passcode
 const verifiedRoomAccess = new Map();
 
@@ -584,56 +586,84 @@ function broadcastRoomMembers(roomId) {
   }
 }
 
+
 // ===============================
-// SIGNUP OTP - DEVELOPMENT TEST
+// SIGNUP OTP - FIRESTORE
 // ===============================
+
+function normalizeSignupEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
+
+function hashSignupOtp(otp) {
+  return crypto
+    .createHash('sha256')
+    .update(String(otp))
+    .digest('hex');
+}
+
+// ===============================
+// SEND SIGNUP OTP
+// ===============================
+
 app.post('/api/signup/send-otp', async (req, res) => {
   try {
     const { email } = req.body;
+    const normalizedEmail = normalizeSignupEmail(email);
 
-    if (!email) {
+    if (!normalizedEmail) {
       return res.status(400).json({
         success: false,
         message: 'Email is required.'
       });
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
-
     // Generate a random 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = crypto
+      .randomInt(100000, 1000000)
+      .toString();
+
+    const otpHash = hashSignupOtp(otp);
 
     // OTP expires after 5 minutes
     const expiresAt = Date.now() + 5 * 60 * 1000;
 
-    // Save OTP temporarily
-    signupOtps.set(normalizedEmail, {
-      otp,
-      expiresAt,
-      attempts: 0
-    });
+    // Store OTP separately for each email address.
+    await firestore
+      .collection('signupOtps')
+      .doc(normalizedEmail)
+      .set({
+        email: normalizedEmail,
+        otpHash,
+        expiresAt,
+        attempts: 0,
+        createdAt: new Date().toISOString()
+      });
 
     // Send OTP email
-    const { data, error } = await resend.emails.send({
-  from: 'TalkieTalkie <onboarding@resend.dev>',
-  to: [normalizedEmail],
-  subject: 'Your TalkieTalkie verification code',
-  html:
-    '<div style="font-family: Arial, sans-serif; max-width: 500px; margin: auto;">' +
-    '<h2>TalkieTalkie Email Verification</h2>' +
-    '<p>Your verification code is:</p>' +
-    '<div style="font-size: 32px; font-weight: bold; letter-spacing: 8px; padding: 20px; text-align: center; background: #f4f4f4; border-radius: 10px;">' +
-    otp +
-    '</div>' +
-    '<p>This code expires in <strong>5 minutes</strong>.</p>' +
-    '<p>If you did not request this code, you can ignore this email.</p>' +
-    '</div>'
-});
+    const { error } = await resend.emails.send({
+      from: 'TalkieTalkie <onboarding@resend.dev>',
+      to: [normalizedEmail],
+      subject: 'Your TalkieTalkie verification code',
+      html:
+        '<div style="font-family: Arial, sans-serif; max-width: 500px; margin: auto;">' +
+        '<h2>TalkieTalkie Email Verification</h2>' +
+        '<p>Your verification code is:</p>' +
+        '<div style="font-size: 32px; font-weight: bold; letter-spacing: 8px; padding: 20px; text-align: center; background: #f4f4f4; border-radius: 10px;">' +
+        otp +
+        '</div>' +
+        '<p>This code expires in <strong>5 minutes</strong>.</p>' +
+        '<p>If you did not request this code, you can ignore this email.</p>' +
+        '</div>'
+    });
+
     if (error) {
       console.error('Resend email error:', error);
 
-      // Remove OTP if email could not be sent
-      signupOtps.delete(normalizedEmail);
+      await firestore
+        .collection('signupOtps')
+        .doc(normalizedEmail)
+        .delete();
 
       return res.status(500).json({
         success: false,
@@ -641,14 +671,9 @@ app.post('/api/signup/send-otp', async (req, res) => {
       });
     }
 
-  console.log(
-  'OTP email sent to ' +
-  normalizedEmail +
-  ' | PID: ' +
-  process.pid +
-  ' | Stored: ' +
-  signupOtps.has(normalizedEmail)
-);
+    console.log(
+      `OTP email sent to ${normalizedEmail} | PID: ${process.pid}`
+    );
 
     return res.status(200).json({
       success: true,
@@ -664,39 +689,44 @@ app.post('/api/signup/send-otp', async (req, res) => {
     });
   }
 });
+
+
 // ===============================
 // VERIFY SIGNUP OTP
 // ===============================
 
-app.post('/api/signup/verify-otp', (req, res) => {
+app.post('/api/signup/verify-otp', async (req, res) => {
   try {
     const { email, otp } = req.body;
 
-    if (!email || !otp) {
+    const normalizedEmail = normalizeSignupEmail(email);
+    const enteredOtp = String(otp || '').trim();
+
+    if (!normalizedEmail || !enteredOtp) {
       return res.status(400).json({
         success: false,
         message: 'Email and OTP are required.'
       });
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
-    const enteredOtp = String(otp).trim();
+    const otpRef = firestore
+      .collection('signupOtps')
+      .doc(normalizedEmail);
 
-    const savedData = signupOtps.get(normalizedEmail);
-    console.log(
-  `OTP verification for ${normalizedEmail} | PID: ${process.pid} | Found: ${!!savedData}`
-);
+    const otpSnapshot = await otpRef.get();
 
-    if (!savedData) {
+    if (!otpSnapshot.exists) {
       return res.status(400).json({
         success: false,
         message: 'OTP not found. Please request a new OTP.'
       });
     }
 
-    // Check if OTP has expired
-    if (Date.now() > savedData.expiresAt) {
-      signupOtps.delete(normalizedEmail);
+    const savedData = otpSnapshot.data();
+
+    // Check expiry
+    if (Date.now() > Number(savedData.expiresAt)) {
+      await otpRef.delete();
 
       return res.status(400).json({
         success: false,
@@ -705,11 +735,13 @@ app.post('/api/signup/verify-otp', (req, res) => {
     }
 
     // Check OTP
-    if (enteredOtp !== savedData.otp) {
-      savedData.attempts += 1;
+    const enteredOtpHash = hashSignupOtp(enteredOtp);
 
-      if (savedData.attempts >= 5) {
-        signupOtps.delete(normalizedEmail);
+    if (enteredOtpHash !== savedData.otpHash) {
+      const newAttempts = Number(savedData.attempts || 0) + 1;
+
+      if (newAttempts >= 5) {
+        await otpRef.delete();
 
         return res.status(429).json({
           success: false,
@@ -717,16 +749,22 @@ app.post('/api/signup/verify-otp', (req, res) => {
         });
       }
 
+      await otpRef.update({
+        attempts: newAttempts
+      });
+
       return res.status(400).json({
         success: false,
         message: 'Incorrect OTP.'
       });
     }
 
-    // OTP is correct
-    signupOtps.delete(normalizedEmail);
+    // OTP is correct — delete it immediately.
+    await otpRef.delete();
 
-    console.log(`OTP verified successfully for ${normalizedEmail}`);
+    console.log(
+      `OTP verified successfully for ${normalizedEmail}`
+    );
 
     return res.status(200).json({
       success: true,
@@ -742,71 +780,6 @@ app.post('/api/signup/verify-otp', (req, res) => {
     });
   }
 });
-
-// Authentication Routes
-app.post('/api/auth/signup', (req, res) => {
-  const { fullName, username, email, age, gender, country, password } = req.body;
-  if (!fullName || !username || !email || !age || !gender || !country || !password) {
-    return res.status(400).json({ success: false, message: 'Please fill in all required fields.' });
-  }
-
-  const newUser = { 
-    id: String(Date.now()), 
-    fullName, 
-    username, 
-    email, 
-    age: Number(age), 
-    gender, 
-    country, 
-    password,
-    adminLogins: 0,
-    guestLogins: 0
-  };
-
-  users.push(newUser);
-  return res.status(201).json({ success: true, message: 'Account created successfully!', user: newUser });
-});
-
-app.post('/api/auth/login', (req, res) => {
-  const { email, phone, username, password, identifier } = req.body;
-  if (password) {
-    const inputId = username || identifier || email;
-    const user = users.find((u) => (u.email === inputId || u.username === inputId) && u.password === password);
-    
-    if (user) {
-      user.adminLogins = (user.adminLogins || 0) + 1;
-
-      return res.status(200).json({
-        success: true,
-        message: 'Login successful!',
-        token: 'demo-jwt-token-' + user.id,
-        user: { 
-          id: user.id, 
-          fullName: user.fullName, 
-          username: user.username, 
-          email: user.email,
-          adminLogins: user.adminLogins,
-          guestLogins: user.guestLogins
-        }
-      });
-    }
-    return res.status(401).json({ success: false, message: 'Invalid credentials. Please check your details.' });
-  }
-  return res.status(400).json({ success: false, message: 'Please provide valid login details.' });
-});
-
-// Logout Endpoint Added
-app.post('/api/auth/logout', (req, res) => {
-  const { username } = req.body;
-  
-  // Perform any optional server-side session/cleanup tasks here if necessary
-
-  return res.status(200).json({ 
-    success: true, 
-    message: 'Logged out successfully.' 
-  });
-});
-
 // Fetch Admin Dashboard Data (FILTERED BY CREATOR USERNAME)
 app.get('/api/admin/data', (req, res) => {
   const currentUser = req.query.username;
