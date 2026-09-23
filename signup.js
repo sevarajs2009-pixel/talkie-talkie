@@ -1,13 +1,16 @@
 import { auth, app } from "./firebase.js";
 
 import {
-    createUserWithEmailAndPassword
+    createUserWithEmailAndPassword,
+    GoogleAuthProvider,
+    signInWithPopup
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 
 import {
     getFirestore,
     doc,
-    setDoc
+    setDoc,
+    getDoc
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 
 const db = getFirestore(app);
@@ -461,4 +464,93 @@ async function createFirebaseAccount() {
             );
         }
     }
+}
+// ========================================
+// GOOGLE SIGN UP
+// ========================================
+
+const googleSignupButton =
+    document.getElementById("google-signup-button");
+
+if (googleSignupButton) {
+
+    googleSignupButton.addEventListener("click", async () => {
+
+        googleSignupButton.disabled = true;
+        googleSignupButton.textContent = "Connecting...";
+
+        try {
+
+            const provider = new GoogleAuthProvider();
+
+            const result = await signInWithPopup(
+                auth,
+                provider
+            );
+
+            const user = result.user;
+
+            console.log(
+                "Google authentication successful:",
+                user.uid
+            );
+
+            // Check whether TalkieTalkie profile already exists
+            const userDoc = await getDoc(
+                doc(db, "users", user.uid)
+            );
+
+            if (userDoc.exists()) {
+
+                // Existing TalkieTalkie account
+                alert("Login successful!");
+
+                window.location.href = "/dashboard.html";
+
+                return;
+            }
+
+            // New Google user
+            alert(
+                "Google account connected. Please complete your TalkieTalkie profile."
+            );
+
+        } catch (error) {
+
+            console.error(
+                "Google sign-in error:",
+                error
+            );
+
+            if (
+                error.code ===
+                "auth/popup-closed-by-user"
+            ) {
+
+                alert("Google sign-in was cancelled.");
+
+            } else if (
+                error.code ===
+                "auth/account-exists-with-different-credential"
+            ) {
+
+                alert(
+                    "An account already exists with this email. Please use your existing login method."
+                );
+
+            } else {
+
+                alert(
+                    "Google sign-in failed: " +
+                    error.message
+                );
+            }
+
+        } finally {
+
+            googleSignupButton.disabled = false;
+            googleSignupButton.textContent =
+                "Continue with Google";
+        }
+    });
 }
