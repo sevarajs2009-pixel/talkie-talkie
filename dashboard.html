@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -90,6 +90,69 @@ window.firebaseDeleteDoc = deleteDoc;
       // Logged-in User Data State
       const [loggedInUser, setLoggedInUser] = React.useState('');
       const [loggedInEmail, setLoggedInEmail] = React.useState('');
+      const [roomVisibility, setRoomVisibility] = React.useState('private');
+      const handleRoomVisibilityChange = async (newVisibility) => {
+  setRoomVisibility(newVisibility);
+
+  try {
+    const user = window.firebaseAuth?.currentUser;
+
+    if (!user) {
+      console.error("No logged-in Firebase user found.");
+      return;
+    }
+
+    // Save the user's Public / Private preference
+    await window.firebaseSetDoc(
+      window.firebaseDoc(
+        window.firebaseDb,
+        "users",
+        user.uid
+      ),
+      {
+        roomVisibility: newVisibility
+      },
+      { merge: true }
+    );
+
+    // Load all rooms owned by this user
+    const roomsRef = window.firebaseCollection(
+      window.firebaseDb,
+      "users",
+      user.uid,
+      "managedRooms"
+    );
+
+    const roomsSnapshot = await window.firebaseGetDocs(roomsRef);
+
+    // Update every existing room in the global directory
+    for (const roomDoc of roomsSnapshot.docs) {
+      const roomData = roomDoc.data();
+
+      await window.firebaseSetDoc(
+        window.firebaseDoc(
+          window.firebaseDb,
+          "rooms",
+          roomData.roomId
+        ),
+        {
+          isPublic: newVisibility === "public"
+        },
+        { merge: true }
+      );
+    }
+
+    console.log(
+      `All existing rooms changed to ${newVisibility}.`
+    );
+
+  } catch (error) {
+    console.error(
+      "Failed to update room visibility:",
+      error
+    );
+  }
+};
       const [clientIp, setClientIp] = React.useState('Fetching IP...');
 
       // Profile Data State - Loaded from Firebase Firestore
@@ -130,8 +193,10 @@ const unsubscribe = window.firebaseOnAuthStateChanged(
 
         console.log("Firestore profile:", profile);
 
-        setLoggedInUser(profile.username || '');
+  setLoggedInUser(profile.username || '');
 setLoggedInEmail(profile.email || user.email || '');
+
+setRoomVisibility(profile.roomVisibility || 'private');
 
 setProfileData((prev) => ({
   ...prev,
@@ -491,6 +556,56 @@ const handleLogout = async () => {
 
       // Managed Rooms Directory State
 const [managedRooms, setManagedRooms] = React.useState([]);
+// Public Room Search State
+const [publicRoomSearch, setPublicRoomSearch] = React.useState('');
+const [publicRoomResults, setPublicRoomResults] = React.useState([]);
+const [publicRoomSearchLoading, setPublicRoomSearchLoading] = React.useState(false);
+const [publicRoomSearchStatus, setPublicRoomSearchStatus] = React.useState('');
+const searchPublicRooms = async () => {
+  const searchText = publicRoomSearch.trim().toLowerCase();
+
+  setPublicRoomResults([]);
+  setPublicRoomSearchStatus('');
+
+  if (!searchText) {
+    setPublicRoomSearchStatus('Enter a room name to search.');
+    return;
+  }
+
+  try {
+    setPublicRoomSearchLoading(true);
+
+    const roomsRef = window.firebaseCollection(
+      window.firebaseDb,
+      "rooms"
+    );
+
+    const roomsSnapshot = await window.firebaseGetDocs(roomsRef);
+
+    const results = roomsSnapshot.docs
+      .map(doc => ({
+        ...doc.data()
+      }))
+      .filter(room =>
+        room.isPublic === true &&
+        typeof room.name === 'string' &&
+        room.name.toLowerCase().includes(searchText)
+      );
+
+    setPublicRoomResults(results);
+
+    if (results.length === 0) {
+      setPublicRoomSearchStatus('No public rooms found.');
+    }
+  } catch (error) {
+    console.error("Public room search failed:", error);
+    setPublicRoomSearchStatus(
+      "Unable to search public rooms. Please try again."
+    );
+  } finally {
+    setPublicRoomSearchLoading(false);
+  }
+};
 
 const [roomHistory, setRoomHistory] = React.useState([]);
 
@@ -566,8 +681,8 @@ React.useEffect(() => {
       const userBusinessRoomsCount = managedRooms.filter(r => loggedInUser && r.userName.toLowerCase() === loggedInUser.toLowerCase() && r.type === 'Business').length;
 
       // Core Room Creation processor with free allowance check
-      const processRoomCreation = (username, email, type, roomName, roomId, secureKey) => {
-        const currentFamilyCount = managedRooms.filter(r => r.userName.toLowerCase() === username.toLowerCase() && r.type === 'Family').length;
+      const processRoomCreation = async (username, email, type, roomName, roomId, secureKey) => {
+          const currentFamilyCount = managedRooms.filter(r => r.userName.toLowerCase() === username.toLowerCase() && r.type === 'Family').length;
         const currentBizCount = managedRooms.filter(r => r.userName.toLowerCase() === username.toLowerCase() && r.type === 'Business').length;
 
         const isExceeding =
@@ -576,7 +691,43 @@ React.useEffect(() => {
             (type === 'Family' && currentFamilyCount >= 1) ||
             (type === 'Business' && currentBizCount >= 1)
           );
+        const normalizedRoomName = roomName.trim().toLowerCase();
 
+try {
+  const publicRoomsRef = window.firebaseCollection(
+    window.firebaseDb,
+    "rooms"
+  );
+
+  const existingRoomsSnapshot = await window.firebaseGetDocs(publicRoomsRef);
+
+  const roomNameAlreadyExists = existingRoomsSnapshot.docs.some((roomDoc) => {
+    const existingRoom = roomDoc.data();
+
+    return (
+      typeof existingRoom.name === "string" &&
+      existingRoom.name.trim().toLowerCase() === normalizedRoomName
+    );
+  });
+
+  if (roomNameAlreadyExists) {
+    console.warn("Room name already exists:", roomName);
+
+    alert(
+      `The room name "${roomName.trim()}" is already in use. Please choose another room name.`
+    );
+
+    return;
+  }
+} catch (error) {
+  console.error("Failed to check room name uniqueness:", error);
+
+  alert(
+    "Unable to verify the room name right now. Please try again."
+  );
+
+  return;
+}
         const roomObj = {
           userName: username,
           email: email.trim(),
@@ -584,6 +735,7 @@ React.useEffect(() => {
           roomId: roomId.trim(),
           secureKey: secureKey.trim(),
           status: 'Active',
+          isPublic: roomVisibility === 'public',
           members: 1,
           type: type,
           participants: [username],
@@ -635,6 +787,7 @@ await window.firebaseSetDoc(
     name: roomObj.name,
     type: roomObj.type,
     status: roomObj.status,
+    isPublic: roomObj.isPublic,
     members: roomObj.members,
     ownerUid: user.uid,
     userName: roomObj.userName,
@@ -1055,15 +1208,144 @@ const handleGuestJoin = async (e) => {
                       <p className="text-[11px]">Family and Business rooms have separate member lists. Free capacity is 6 members per room.</p>
                     </div>
                   </div>
+                  {roomVisibility === 'public' && (
+  <div className="bg-dark-800 border border-dark-border rounded-3xl p-5 flex flex-col gap-4 shadow-lg">
+    
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2.5">
+        <div className="w-8 h-8 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-400">
+          <span className="material-symbols-outlined text-base">public</span>
+        </div>
 
-                  <div className="bg-dark-800 border border-dark-border rounded-3xl p-5 flex flex-col gap-4 shadow-lg">
+        <div>
+          <h3 className="text-sm font-bold text-white">Public Room Search</h3>
+          <p className="text-[10px] text-slate-500">
+            Search public rooms by room name
+          </p>
+        </div>
+      </div>
+
+      <span className="text-[10px] font-bold tracking-widest px-2.5 py-0.5 rounded-full bg-brand-500/10 text-brand-400 uppercase">
+        PUBLIC
+      </span>
+    </div>
+
+    <div className="flex gap-2">
+      <input
+        type="text"
+        value={publicRoomSearch}
+        onChange={(e) => setPublicRoomSearch(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            searchPublicRooms();
+          }
+        }}
+        placeholder="Enter room name..."
+        className="flex-1 px-3.5 py-2.5 rounded-xl border border-dark-border bg-dark-900 text-white text-xs outline-none focus:border-brand-500"
+      />
+
+      <button
+        type="button"
+        onClick={searchPublicRooms}
+        disabled={publicRoomSearchLoading}
+        className="px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-400 text-white text-xs font-bold transition-all disabled:opacity-50"
+      >
+        {publicRoomSearchLoading ? 'Searching...' : 'Search'}
+      </button>
+    </div>
+
+    {publicRoomSearchStatus && (
+      <p className="text-[11px] text-slate-400">
+        {publicRoomSearchStatus}
+      </p>
+    )}
+
+    {publicRoomResults.length > 0 && (
+      <div className="flex flex-col gap-2">
+        {publicRoomResults.map((room) => (
+          <div
+            key={room.roomId}
+            className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-dark-900 border border-dark-border"
+          >
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-white truncate">
+                {room.name}
+              </p>
+
+              <p className="text-[10px] text-slate-500">
+                {room.type} · {room.members || 0}/6 members
+              </p>
+            </div>
+
+            <button
+  type="button"
+  onClick={() => {
+    setGuestJoinData((prev) => ({
+      ...prev,
+      roomId: room.roomId
+    }));
+
+    setTimeout(() => {
+      const guestPortal = document.getElementById("guest-access-portal");
+
+      if (guestPortal) {
+        guestPortal.scrollIntoView({
+          behavior: "smooth",
+          block: "center"
+        });
+      }
+    }, 50);
+  }}
+  className="shrink-0 px-3 py-2 rounded-xl bg-brand-500 hover:bg-brand-400 text-white text-[10px] font-bold transition-all"
+>
+  Join
+</button>
+          </div>
+        ))}
+      </div>
+    )}
+
+  </div>
+)}
+                  <div
+  id="guest-access-portal"
+  className="bg-dark-800 border border-dark-border rounded-3xl p-5 flex flex-col gap-4 shadow-lg"
+>
+
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-400">
-                          <span className="material-symbols-outlined text-base">login</span>
-                        </div>
-                        <h3 className="text-sm font-bold text-white">Guest Access Portal</h3>
-                      </div>
+  <div className="w-8 h-8 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-400">
+    <span className="material-symbols-outlined text-base">login</span>
+  </div>
+  <h3 className="text-sm font-bold text-white">Guest Access Portal</h3>
+</div>
+
+<div className="flex items-center gap-1 p-1 rounded-xl bg-dark-900 border border-dark-border">
+  <button
+    type="button"
+    onClick={() => handleRoomVisibilityChange('private')}
+    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
+      roomVisibility === 'private'
+        ? 'bg-slate-700 text-white shadow'
+        : 'text-slate-500 hover:text-slate-300'
+    }`}
+  >
+    Private
+  </button>
+
+  <button
+    type="button"
+    onClick={() => handleRoomVisibilityChange('public')}
+    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
+      roomVisibility === 'public'
+        ? 'bg-brand-500 text-white shadow'
+        : 'text-slate-500 hover:text-slate-300'
+    }`}
+  >
+    Public
+  </button>
+</div>
                       <span className="text-[10px] font-bold tracking-widest px-2.5 py-0.5 rounded-full bg-slate-700/50 text-slate-300 uppercase">JOINER</span>
                     </div>
 

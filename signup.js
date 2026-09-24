@@ -16,15 +16,13 @@ import {
 const db = getFirestore(app);
 
 const signupForm = document.getElementById("signup-form");
-const otpSection = document.getElementById("otp-section");
-const emailField = document.getElementById("email-field");
-const otpInput = document.getElementById("otp");
-const verifyOtpButton = document.getElementById("verify-otp-button");
+
 
 const signupButton = signupForm.querySelector('button[type="submit"]');
+let pendingSignupData = null;
 
 
-const resendOtpButton = document.getElementById("resend-otp-button");
+
 
 // ========================================
 // LIVE PASSWORD CHECKER
@@ -70,40 +68,9 @@ passwordInput.addEventListener("input", () => {
 );
 });
 
-let resendTimer = 30;
-let resendInterval = null;
-
-function startResendCountdown() {
-    resendOtpButton.disabled = true;
-    resendTimer = 30;
-
-    resendOtpButton.textContent = `Resend OTP (${resendTimer}s)`;
-
-    if (resendInterval) {
-        clearInterval(resendInterval);
-    }
-
-    resendInterval = setInterval(() => {
-        resendTimer--;
-
-        resendOtpButton.textContent = `Resend OTP (${resendTimer}s)`;
-
-        if (resendTimer <= 0) {
-            clearInterval(resendInterval);
-            resendInterval = null;
-
-            resendOtpButton.disabled = false;
-            resendOtpButton.textContent = "Resend OTP";
-        }
-    }, 1000);
-}
-
-let pendingSignupData = null;
 
 
-// ========================================
-// STEP 1 — SIGN UP FORM
-// ========================================
+
 
 signupForm.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -137,7 +104,7 @@ signupForm.addEventListener("submit", async (e) => {
     }
 
     // Save signup information temporarily
-    pendingSignupData = {
+      pendingSignupData = {
         fullName,
         username,
         email,
@@ -147,199 +114,18 @@ signupForm.addEventListener("submit", async (e) => {
         password
     };
 
-    // Disable signup button while sending OTP
     signupButton.disabled = true;
-    signupButton.textContent = "Sending Code...";
+    signupButton.textContent = "Creating Account...";
 
     try {
-        // ========================================
-        // REQUEST OTP
-        // ========================================
-
-        const response = await fetch("/api/signup/send-otp", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                email: email
-            })
-        });
-
-        const data = await response.json();
-
-        if (!response.ok || !data.success) {
-            alert(data.message || "Could not send verification code.");
-
-            signupButton.disabled = false;
-            signupButton.textContent = "Sign Up";
-
-            pendingSignupData = null;
-
-            return;
-        }
-
-        // Development testing only
-        console.log("TEST OTP:", data.testOtp);
-
-        // ========================================
-        // SHOW OTP SECTION
-        // ========================================
-        emailField.replaceWith(otpSection);
-        otpSection.classList.remove("hidden");
-        
-
-        otpInput.value = "";
-        otpInput.focus();
-
-        signupButton.textContent = "Code Sent ✓";
-
-        startResendCountdown();
-
-        // Scroll OTP box into view
-        otpSection.scrollIntoView({
-            behavior: "smooth",
-            block: "center"
-        });
-
-    } catch (error) {
-        console.error("OTP request failed:", error);
-
-        alert("Could not connect to the server.");
-
-        signupButton.disabled = false;
-        signupButton.textContent = "Sign Up";
-
-        pendingSignupData = null;
-    }
-});
-
-
-// ========================================
-// STEP 2 — VERIFY OTP
-// ========================================
-
-resendOtpButton.addEventListener("click", async () => {
-
-    if (!pendingSignupData) {
-        alert("Please enter your signup details first.");
-        return;
-    }
-
-    resendOtpButton.disabled = true;
-    resendOtpButton.textContent = "Sending...";
-
-    try {
-        const response = await fetch("/api/signup/send-otp", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                email: pendingSignupData.email
-            })
-        });
-
-        const data = await response.json();
-
-        if (!response.ok || !data.success) {
-            alert(data.message || "Could not resend verification code.");
-            resendOtpButton.disabled = false;
-            resendOtpButton.textContent = "Resend OTP";
-            return;
-        }
-
-        otpInput.value = "";
-        otpInput.focus();
-
-        alert("A new verification code has been sent to your email.");
-
-        startResendCountdown();
-
-    } catch (error) {
-
-        console.error("Resend OTP failed:", error);
-
-        alert("Could not resend the verification code.");
-
-        resendOtpButton.disabled = false;
-        resendOtpButton.textContent = "Resend OTP";
-    }
-});
-
-
-verifyOtpButton.addEventListener("click", async () => {
-
-    if (!pendingSignupData) {
-        alert("Please request a verification code first.");
-        return;
-    }
-
-    const enteredOtp = otpInput.value.trim();
-
-    // Validate OTP
-    if (!/^\d{6}$/.test(enteredOtp)) {
-        alert("Please enter the 6-digit verification code.");
-        otpInput.focus();
-        return;
-    }
-
-    verifyOtpButton.disabled = true;
-    verifyOtpButton.textContent = "Verifying...";
-
-    try {
-
-        // ========================================
-        // VERIFY OTP WITH SERVER
-        // ========================================
-
-        const verifyResponse = await fetch("/api/signup/verify-otp", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                email: pendingSignupData.email,
-                otp: enteredOtp
-            })
-        });
-
-        const verifyData = await verifyResponse.json();
-
-        if (!verifyResponse.ok || !verifyData.success) {
-
-            alert(
-                verifyData.message ||
-                "Invalid verification code."
-            );
-
-            verifyOtpButton.disabled = false;
-            verifyOtpButton.textContent = "Verify OTP";
-
-            otpInput.focus();
-
-            return;
-        }
-
-        // ========================================
-        // OTP VERIFIED
-        // ========================================
-
-        verifyOtpButton.textContent = "Verified ✓";
-
-        console.log("OTP verified successfully.");
-
-        // Now create Firebase account
         await createFirebaseAccount();
 
     } catch (error) {
+        console.error("Signup error:", error);
 
-        console.error("OTP verification failed:", error);
-
-        alert("Could not verify the code. Please try again.");
-
-        verifyOtpButton.disabled = false;
-        verifyOtpButton.textContent = "Verify OTP";
+        signupButton.disabled = false;
+        signupButton.textContent = "Sign Up";
+        pendingSignupData = null;
     }
 });
 
@@ -347,12 +133,11 @@ verifyOtpButton.addEventListener("click", async () => {
 // ========================================
 // STEP 3 — CREATE FIREBASE ACCOUNT
 // ========================================
-
 async function createFirebaseAccount() {
 
     try {
 
-        verifyOtpButton.textContent = "Creating Account...";
+        signupButton.textContent = "Creating Account...";
 
         const {
             fullName,
@@ -422,8 +207,8 @@ async function createFirebaseAccount() {
             error
         );
 
-        verifyOtpButton.disabled = false;
-        verifyOtpButton.textContent = "Verify OTP";
+        signupButton.disabled = false;
+signupButton.textContent = "Sign Up";
 
 
         if (error.code === "auth/email-already-in-use") {
