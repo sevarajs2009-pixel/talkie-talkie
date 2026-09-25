@@ -95,6 +95,161 @@ app.use(express.json());
 app.use(express.static(__dirname));
 
 // ============================================================
+// GENERAL SUPPORT DESK — EMAIL TICKET
+// Sends authenticated user support requests to the owner email.
+// ============================================================
+
+app.post('/api/support/ticket', async (req, res) => {
+  try {
+    // User must be logged in with Firebase
+    const decodedToken = await verifyFirebaseToken(req);
+
+    const userEmail = decodedToken.email || 'Unknown email';
+    const uid = decodedToken.uid;
+
+    const subject = String(req.body.subject || '').trim();
+    const message = String(req.body.message || '').trim();
+
+    // Validate required fields
+    if (!subject || !message) {
+      return res.status(400).json({
+        success: false,
+        message: 'Subject and message are required.'
+      });
+    }
+
+    // Prevent excessively large support requests
+    if (subject.length > 150) {
+      return res.status(400).json({
+        success: false,
+        message: 'Subject is too long.'
+      });
+    }
+
+    if (message.length > 5000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Message is too long. Maximum 5000 characters.'
+      });
+    }
+
+    const resendApiKey =
+      process.env.TALKIETALKIE_SUPPORT_RESEND_API_KEY;
+
+    if (!resendApiKey) {
+      console.error(
+        'TALKIETALKIE_SUPPORT_RESEND_API_KEY is missing.'
+      );
+
+      return res.status(503).json({
+        success: false,
+        message: 'Support email service is not configured.'
+      });
+    }
+
+    const emailHtml = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+        <h2>TalkieTalkie General Support Ticket</h2>
+
+        <p>
+          <strong>Subject:</strong>
+          ${subject.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+        </p>
+
+        <p>
+          <strong>User Email:</strong>
+          ${userEmail.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+        </p>
+
+        <p>
+          <strong>Firebase UID:</strong>
+          ${uid}
+        </p>
+
+        <hr>
+
+        <h3>User Message</h3>
+
+        <p style="white-space: pre-wrap;">
+          ${message
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;')}
+        </p>
+      </div>
+    `;
+
+    const resendResponse = await fetch(
+      'https://api.resend.com/emails',
+      {
+        method: 'POST',
+
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${resendApiKey}`
+        },
+
+        body: JSON.stringify({
+          from: 'TalkieTalkie Support <onboarding@resend.dev>',
+          to: ['sevarajs2009@gmail.com'],
+          subject: `[TalkieTalkie Support] ${subject}`,
+          html: emailHtml
+        })
+      }
+    );
+
+    const resendData = await resendResponse.json();
+
+    if (!resendResponse.ok) {
+      console.error(
+        'Resend support email error:',
+        resendData
+      );
+
+      return res.status(502).json({
+        success: false,
+        message: 'Unable to send support ticket email.'
+      });
+    }
+
+    console.log(
+      `Support ticket sent | UID: ${uid} | Email: ${userEmail} | Resend ID: ${resendData.id}`
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'Support ticket sent successfully.'
+    });
+
+  } catch (error) {
+
+    console.error(
+      'Support ticket error:',
+      error
+    );
+
+    if (
+      error.message === 'NO_TOKEN' ||
+      error.code === 'auth/id-token-expired' ||
+      error.code === 'auth/argument-error' ||
+      error.code === 'auth/invalid-id-token'
+    ) {
+      return res.status(401).json({
+        success: false,
+        message: 'Please log in again before sending a support ticket.'
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to send support ticket.'
+    });
+  }
+});
+
+// ============================================================
 // RAZORPAY PAYMENT ROUTES
 // ============================================================
 
