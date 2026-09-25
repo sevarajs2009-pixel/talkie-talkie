@@ -998,24 +998,184 @@ const handleGuestJoin = async (e) => {
           setCouponStatus('Invalid coupon code. Try "TALKIE20".');
         }
       };
+    
+      const handleSupportSubmit = async (e) => {
+  e.preventDefault();
 
-      const handleSupportSubmit = (e) => {
-        e.preventDefault();
-        if (!supportForm.subject || !supportForm.message) return;
-        setSupportSubmitted(true);
-        setTimeout(() => {
-          setSupportSubmitted(false);
-          setIsSupportOpen(false);
-          setSupportForm({ subject: '', message: '' });
-        }, 1500);
-      };
+  if (!supportForm.subject.trim() || !supportForm.message.trim()) {
+    return;
+  }
 
-      const handleUpdateManagedRoom = (e) => {
-        e.preventDefault();
-        if (!managingRoom) return;
-        setManagedRooms(prev => prev.map(room => room.roomId === managingRoom.roomId ? managingRoom : room));
+  try {
+    const user = window.firebaseAuth?.currentUser;
+
+    if (!user) {
+      alert("You must be logged in to contact support.");
+      return;
+    }
+
+    // Get the user's Firebase authentication token
+    const idToken = await user.getIdToken();
+
+    // Send the support ticket to our backend
+    const response = await fetch(
+      "https://talkie-talkie-server.onrender.com/api/support/ticket",
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        },
+
+        body: JSON.stringify({
+          subject: supportForm.subject.trim(),
+          message: supportForm.message.trim()
+        })
+      }
+    );
+
+    const result = await response.json();
+
+    console.log("Support ticket result:", result);
+
+    if (!response.ok || !result.success) {
+      alert(
+        result.message ||
+        "Unable to send support ticket. Please try again."
+      );
+      return;
+    }
+
+    // Only show success after the backend confirms
+    setSupportSubmitted(true);
+
+    setTimeout(() => {
+      setSupportSubmitted(false);
+      setIsSupportOpen(false);
+      setSupportForm({
+        subject: '',
+        message: ''
+      });
+    }, 1500);
+
+  } catch (error) {
+
+    console.error(
+      "Support ticket submission error:",
+      error
+    );
+
+    alert(
+      "Could not connect to the support server. Please try again."
+    );
+  }
+};
+
+      const handleUpdateManagedRoom = async (e) => {
+    e.preventDefault();
+
+    if (!managingRoom) return;
+
+    try {
+        const user = window.firebaseAuth?.currentUser;
+
+        if (!user) {
+            alert("You must be logged in.");
+            return;
+        }
+
+        // Global room document
+        const globalRoomRef = window.firebaseDoc(
+            window.firebaseDb,
+            "rooms",
+            managingRoom.roomId
+        );
+
+        // Read the existing global room first
+        const globalRoomSnapshot =
+            await window.firebaseGetDoc(globalRoomRef);
+
+        const existingGlobalRoom = globalRoomSnapshot.exists()
+            ? globalRoomSnapshot.data()
+            : {};
+
+        // IMPORTANT:
+        // Preserve the existing Public / Private status
+        const preservedIsPublic =
+            existingGlobalRoom.isPublic === true ||
+            managingRoom.isPublic === true;
+
+        const updatedRoom = {
+            ...managingRoom,
+            isPublic: preservedIsPublic,
+            participants: managingRoom.participants || [],
+            membersList: managingRoom.membersList || []
+        };
+
+        // Save updated room to user's managed rooms
+        await window.firebaseSetDoc(
+            window.firebaseDoc(
+                window.firebaseDb,
+                "users",
+                user.uid,
+                "managedRooms",
+                updatedRoom.roomId
+            ),
+            updatedRoom
+        );
+
+        // Update global room used by Public Search
+        await window.firebaseSetDoc(
+            globalRoomRef,
+            {
+                roomId: updatedRoom.roomId,
+                name: updatedRoom.name,
+                type: updatedRoom.type,
+                status: updatedRoom.status,
+                isPublic: preservedIsPublic,
+                members: updatedRoom.members,
+                ownerUid: user.uid,
+                userName: updatedRoom.userName,
+                createdAt: updatedRoom.createdAt,
+                participants: updatedRoom.participants,
+                membersList: updatedRoom.membersList
+            },
+            { merge: true }
+        );
+
+        // Update dashboard immediately
+        setManagedRooms(prev =>
+            prev.map(room =>
+                room.roomId === updatedRoom.roomId
+                    ? updatedRoom
+                    : room
+            )
+        );
+
         setManagingRoom(null);
-      };
+
+        console.log(
+            "Room updated successfully:",
+            updatedRoom.roomId,
+            updatedRoom.name,
+            "Public:",
+            preservedIsPublic
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Error updating room:",
+            error
+        );
+
+        alert(
+            "Unable to update the room: " +
+            error.message
+        );
+    }
+};
 
       const openMemberManager = (room) => {
         const members = Array.isArray(room.membersList) ? room.membersList :
