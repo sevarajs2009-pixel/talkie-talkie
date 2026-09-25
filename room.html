@@ -326,13 +326,20 @@
         <!-- Business Collaboration Tools -->
     <section id="business-tools-section" class="hidden">
       <button
-        onclick="toggleBusinessChat()"
-        class="w-full h-12 rounded-xl bg-blue-600/15 hover:bg-blue-600/25 text-blue-400 border border-blue-500/30 flex items-center justify-center gap-2 transition-all font-bold text-xs active:scale-95"
-      >
-        <span class="material-symbols-outlined text-[20px]">chat</span>
-        Business Chat
-      </button>
-    </section>
+  onclick="toggleBusinessChat()"
+  class="relative w-full h-12 rounded-xl bg-blue-600/15 hover:bg-blue-600/25 text-blue-400 border border-blue-500/30 flex items-center justify-center gap-2 transition-all font-bold text-xs active:scale-95"
+>
+  <span class="material-symbols-outlined text-[20px]">chat</span>
+  Business Chat
+
+  <!-- Unread Chat Notification -->
+  <span
+    id="business-chat-unread-badge"
+    class="hidden absolute top-1 right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[9px] font-black items-center justify-center border-2 border-slate-900"
+  >
+    0
+  </span>
+</button>
 
     <!-- Business Video Conference -->
 <section id="business-video-section" class="hidden mt-3">
@@ -480,7 +487,38 @@
         </div>
       </div>
     </div>
+        <!-- View Controls -->
+    <div class="flex items-center gap-2">
 
+      <!-- Grid View -->
+      <button
+        id="video-grid-view-btn"
+        onclick="setBusinessVideoView('grid')"
+        class="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center"
+        title="Grid View"
+      >
+        <span class="material-symbols-outlined text-[18px]">
+          grid_view
+        </span>
+      </button>
+
+      <!-- Tile View -->
+      <button
+        id="video-tile-view-btn"
+        onclick="setBusinessVideoView('tile')"
+        class="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/15 text-white flex items-center justify-center"
+        title="Tile View"
+      >
+        <span class="material-symbols-outlined text-[18px]">
+          view_agenda
+        </span>
+      </button>
+
+    </div>
+
+    <!-- Close Button -->
+    <button
+      onclick="toggleBusinessVideo(false)"
     <!-- Close Button -->
     <button
       onclick="toggleBusinessVideo(false)"
@@ -586,6 +624,7 @@
 
     let ws = null;
     let businessChatMessages = [];
+    let businessChatUnreadCount = 0;
     let audioStream = null;
     let audioContext = null;
     let scriptProcessor = null;
@@ -751,7 +790,32 @@
     // ============================================================
 // BUSINESS CHAT — OPEN / CLOSE
 // ============================================================
+function updateBusinessChatUnreadBadge() {
+  const badge = document.getElementById(
+    'business-chat-unread-badge'
+  );
 
+  if (!badge) {
+    return;
+  }
+
+  if (businessChatUnreadCount > 0) {
+
+    badge.textContent =
+      businessChatUnreadCount > 99
+        ? '99+'
+        : businessChatUnreadCount;
+
+    badge.classList.remove('hidden');
+    badge.classList.add('flex');
+
+  } else {
+
+    badge.classList.add('hidden');
+    badge.classList.remove('flex');
+
+  }
+}
 function toggleBusinessChat(forceState = null) {
   // Family rooms can never open Business Chat
   if (roomType !== 'business') {
@@ -772,6 +836,8 @@ function toggleBusinessChat(forceState = null) {
   if (shouldOpen) {
     modal.classList.remove('hidden');
     modal.classList.add('flex');
+    businessChatUnreadCount = 0;
+    updateBusinessChatUnreadBadge();
 
     const roomNameElement = document.getElementById('business-chat-room-name');
 
@@ -956,6 +1022,99 @@ let businessVideoPeers = new Map();
 
 let businessVideoMicOn = true;
 let businessVideoCameraOn = true;
+// ============================================================
+// BUSINESS VIDEO VIEW MODE
+// ============================================================
+
+let businessVideoViewMode = 'grid';
+
+function setBusinessVideoView(mode) {
+
+  const grid =
+    document.getElementById('business-video-grid');
+
+  if (!grid) {
+    return;
+  }
+
+  businessVideoViewMode = mode;
+    const videoTiles =
+    document.querySelectorAll('.business-video-tile');
+
+  videoTiles.forEach(tile => {
+
+    if (mode === 'grid') {
+
+      tile.classList.remove(
+        'w-full',
+        'min-h-[320px]'
+      );
+
+      tile.classList.add(
+        'min-h-[220px]'
+      );
+
+    } else {
+
+      tile.classList.remove(
+        'min-h-[220px]'
+      );
+
+      tile.classList.add(
+        'w-full',
+        'min-h-[320px]'
+      );
+
+    }
+
+  });
+
+  if (mode === 'grid') {
+
+    grid.className =
+      'flex-1 p-3 grid grid-cols-1 sm:grid-cols-2 gap-3 overflow-auto';
+
+  } else if (mode === 'tile') {
+
+    grid.className =
+      'flex-1 p-3 flex flex-col gap-3 overflow-auto';
+
+  }
+
+  updateBusinessVideoViewButtons();
+}
+
+
+function updateBusinessVideoViewButtons() {
+
+  const gridButton =
+    document.getElementById('video-grid-view-btn');
+
+  const tileButton =
+    document.getElementById('video-tile-view-btn');
+
+  if (!gridButton || !tileButton) {
+    return;
+  }
+
+  if (businessVideoViewMode === 'grid') {
+
+    gridButton.className =
+      'w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center';
+
+    tileButton.className =
+      'w-9 h-9 rounded-xl bg-white/10 hover:bg-white/15 text-white flex items-center justify-center';
+
+  } else {
+
+    gridButton.className =
+      'w-9 h-9 rounded-xl bg-white/10 hover:bg-white/15 text-white flex items-center justify-center';
+
+    tileButton.className =
+      'w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center';
+
+  }
+}
 
 
 // ============================================================
@@ -1082,9 +1241,9 @@ function createBusinessVideoTile(
   const tile = document.createElement('div');
 
   tile.id = `video-tile-${peerId}`;
-
+  
   tile.className =
-    'relative bg-slate-900 rounded-2xl overflow-hidden border border-white/10 min-h-[220px] shadow-xl';
+  'business-video-tile relative bg-slate-900 rounded-2xl overflow-hidden border border-white/10 min-h-[220px] shadow-xl';
 
   const video = document.createElement('video');
 
@@ -1092,7 +1251,7 @@ function createBusinessVideoTile(
     `video-element-${peerId}`;
 
   video.className =
-    'w-full h-full min-h-[220px] object-cover bg-black';
+  'w-full h-full min-h-[220px] aspect-video object-cover bg-black';
 
   video.autoplay = true;
   video.playsInline = true;
@@ -1769,8 +1928,7 @@ function updateBusinessVideoControls() {
 
     async function initRoomConnection() {
       try {
-  const protocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
-
+    const protocol = 'wss://';
   const { auth } = await import("./firebase.js");
 
 await auth.authStateReady();
@@ -2032,7 +2190,27 @@ case 'CHAT_HISTORY':
 
 case 'CHAT_MESSAGE':
   if (data.message) {
+
     businessChatMessages.push(data.message);
+
+    const chatModal =
+      document.getElementById('business-chat-modal');
+
+    const isChatOpen =
+      chatModal &&
+      !chatModal.classList.contains('hidden');
+
+    const isMessageFromOtherUser =
+      data.message.userName !== userName;
+
+    if (
+      !isChatOpen &&
+      isMessageFromOtherUser
+    ) {
+      businessChatUnreadCount++;
+
+      updateBusinessChatUnreadBadge();
+    }
   }
 
   renderBusinessChat();
