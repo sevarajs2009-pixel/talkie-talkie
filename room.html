@@ -1903,9 +1903,7 @@ const localVideoTrack =
 if (localVideoTrack) {
   peerConnection.addTrack(
     localVideoTrack,
-    businessVideoScreenSharing
-      ? businessVideoScreenStream
-      : businessVideoStream
+    businessVideoStream
   );
 }
 
