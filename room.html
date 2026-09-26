@@ -2492,6 +2492,17 @@ async function toggleBusinessVideoScreenShare() {
   if (roomType !== 'business') {
     return;
   }
+    // Screen sharing is not supported on this device/browser
+  const screenShareSupported =
+    navigator.mediaDevices &&
+    typeof navigator.mediaDevices.getDisplayMedia === 'function';
+
+  if (!screenShareSupported) {
+    alert(
+      'Screen sharing is not supported on this mobile browser. Please use a desktop browser to share your screen.'
+    );
+    return;
+  }
 
   // If already sharing, stop sharing
   if (businessVideoScreenSharing) {
