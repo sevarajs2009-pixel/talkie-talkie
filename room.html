@@ -2713,6 +2713,52 @@ function updateBusinessVideoScreenShareButton() {
     return;
   }
 
+  // Detect Android devices
+  const isAndroid =
+    /Android/i.test(navigator.userAgent);
+
+  // Android Chrome may not support getDisplayMedia()
+  const screenShareSupported =
+    navigator.mediaDevices &&
+    typeof navigator.mediaDevices.getDisplayMedia === 'function';
+
+  // ------------------------------------------------------------
+  // MOBILE / UNSUPPORTED DEVICE
+  // ------------------------------------------------------------
+
+  if (isAndroid || !screenShareSupported) {
+
+    button.disabled = true;
+
+    button.title =
+      'Screen sharing is available on desktop browsers';
+
+    button.className =
+      'w-12 h-12 rounded-full bg-white/5 text-white/30 flex items-center justify-center cursor-not-allowed';
+
+    const icon =
+      button.querySelector(
+        '.material-symbols-outlined'
+      );
+
+    if (icon) {
+      icon.textContent = 'desktop_windows';
+    }
+
+    return;
+  }
+
+  // ------------------------------------------------------------
+  // DESKTOP — SCREEN SHARE SUPPORTED
+  // ------------------------------------------------------------
+
+  button.disabled = false;
+
+  button.title =
+    businessVideoScreenSharing
+      ? 'Stop Sharing'
+      : 'Share Screen';
+
   const icon =
     button.querySelector(
       '.material-symbols-outlined'
@@ -2735,8 +2781,6 @@ function updateBusinessVideoScreenShareButton() {
       : 'w-12 h-12 rounded-full bg-white/10 hover:bg-white/15 text-white flex items-center justify-center';
 
 }
-
-
 // ============================================================
 // UPDATE VIDEO CONTROLS
 // ============================================================
