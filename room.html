@@ -2587,22 +2587,29 @@ screenTrack.contentHint = 'detail';
       'BUSINESS VIDEO SCREEN SHARE STARTED'
     );
 
-  } catch (error) {
+    } catch (error) {
 
     console.error(
-      'Screen share error:',
+      'SCREEN SHARE ERROR NAME:',
+      error.name
+    );
+
+    console.error(
+      'SCREEN SHARE ERROR MESSAGE:',
+      error.message
+    );
+
+    console.error(
+      'SCREEN SHARE ERROR FULL:',
       error
     );
 
-    // User cancelling the browser picker is normal.
-    if (
-      error.name !== 'AbortError' &&
-      error.name !== 'NotAllowedError'
-    ) {
-      alert(
-        'Unable to start Screen Share.'
-      );
-    }
+    alert(
+      'Screen Share Error: ' +
+      error.name +
+      '\n\n' +
+      (error.message || 'No error message')
+    );
 
   }
 }
