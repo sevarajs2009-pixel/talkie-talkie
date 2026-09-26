@@ -513,6 +513,17 @@
           view_agenda
         </span>
       </button>
+      <!-- Speaker View -->
+<button
+  id="video-speaker-view-btn"
+  onclick="setBusinessVideoView('speaker')"
+  class="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/15 text-white flex items-center justify-center"
+  title="Speaker View"
+>
+  <span class="material-symbols-outlined text-[18px]">
+    present_to_all
+  </span>
+</button>
 
     </div>
 
@@ -1016,107 +1027,578 @@ function scrollBusinessChatToBottom() {
     // ============================================================
 // BUSINESS VIDEO CONFERENCE — WEBRTC
 // ============================================================
-
 let businessVideoStream = null;
 let businessVideoPeers = new Map();
 
 let businessVideoMicOn = true;
 let businessVideoCameraOn = true;
+
+let businessVideoViewMode = 'grid';
+
+// ============================================================
+// SPEAKER VIEW STATE
+// ============================================================
+
+let businessVideoActiveSpeaker = 'local';
+
+let businessVideoAudioContext = null;
+let businessVideoAudioAnalysers = new Map();
+let businessVideoAudioData = new Map();
+let businessVideoAudioSources = new Map();
+
+let businessVideoSpeakerTimer = null;
+let businessVideoSpeakerCandidate = null;
+let businessVideoSpeakerCandidateSince = 0;
+
+let businessVideoSpeakerMonitor = null;
+
 // ============================================================
 // BUSINESS VIDEO VIEW MODE
 // ============================================================
 
-let businessVideoViewMode = 'grid';
+// ============================================================
+// BUSINESS VIDEO AUDIO ANALYSER
+// ============================================================
 
+function setupBusinessVideoAudioAnalyser(
+  peerId,
+  stream
+) {
+
+  if (!stream) {
+    return;
+  }
+
+  if (
+    businessVideoAudioAnalysers.has(peerId)
+  ) {
+    return;
+  }
+
+  try {
+
+    if (!businessVideoAudioContext) {
+
+      const AudioContext =
+        window.AudioContext ||
+        window.webkitAudioContext;
+
+      if (!AudioContext) {
+        console.warn(
+          'Web Audio API is not supported.'
+        );
+        return;
+      }
+
+      businessVideoAudioContext =
+        new AudioContext();
+    }
+
+    if (
+      businessVideoAudioContext.state ===
+      'suspended'
+    ) {
+      businessVideoAudioContext.resume()
+        .catch(() => {});
+    }
+
+    const analyser =
+      businessVideoAudioContext.createAnalyser();
+
+    analyser.fftSize = 256;
+
+    analyser.smoothingTimeConstant = 0.75;
+
+    const audioSource =
+      businessVideoAudioContext
+        .createMediaStreamSource(stream);
+
+    audioSource.connect(analyser);
+
+    const audioData =
+      new Uint8Array(
+        analyser.fftSize
+      );
+
+    businessVideoAudioAnalysers.set(
+      peerId,
+      analyser
+    );
+
+    businessVideoAudioData.set(
+      peerId,
+      audioData
+    );
+
+    businessVideoAudioSources.set(
+      peerId,
+      audioSource
+    );
+
+    console.log(
+      'Audio analyser ready:',
+      peerId
+    );
+
+  } catch (error) {
+
+    console.error(
+      'Failed to setup video audio analyser:',
+      error
+    );
+
+  }
+}
+// ============================================================
+// MEASURE BUSINESS VIDEO SPEAKER AUDIO
+// ============================================================
+
+function measureBusinessVideoSpeakerAudio() {
+
+  const speakerLevels = new Map();
+
+  businessVideoAudioAnalysers.forEach(
+    (analyser, peerId) => {
+
+      const audioData =
+        businessVideoAudioData.get(peerId);
+
+      if (!audioData) {
+        return;
+      }
+
+      analyser.getByteTimeDomainData(
+        audioData
+      );
+
+      let sum = 0;
+
+      for (
+        let i = 0;
+        i < audioData.length;
+        i++
+      ) {
+
+        const normalized =
+          (audioData[i] - 128) / 128;
+
+        sum +=
+          normalized *
+          normalized;
+      }
+
+      const rms =
+        Math.sqrt(
+          sum /
+          audioData.length
+        );
+
+      speakerLevels.set(
+        peerId,
+        rms
+      );
+    }
+  );
+
+  return speakerLevels;
+}
+// ============================================================
+// FIND LOUDest BUSINESS VIDEO SPEAKER
+// ============================================================
+
+function detectBusinessVideoActiveSpeaker() {
+
+  const speakerLevels =
+    measureBusinessVideoSpeakerAudio();
+
+  if (!speakerLevels.size) {
+    return;
+  }
+
+  const SPEAKING_THRESHOLD = 0.035;
+
+  let loudestPeerId = null;
+  let loudestLevel = 0;
+
+  speakerLevels.forEach(
+    (level, peerId) => {
+
+      if (
+        level > SPEAKING_THRESHOLD &&
+        level > loudestLevel
+      ) {
+
+        loudestLevel = level;
+        loudestPeerId = peerId;
+
+      }
+    }
+  );
+
+  if (!loudestPeerId) {
+    return;
+  }
+
+  // ============================================================
+// START BUSINESS VIDEO SPEAKER MONITOR
+// ============================================================
+
+function startBusinessVideoSpeakerMonitor() {
+
+  if (businessVideoSpeakerMonitor) {
+    return;
+  }
+
+  function monitor() {
+
+    if (
+      businessVideoViewMode === 'speaker'
+    ) {
+      detectBusinessVideoActiveSpeaker();
+    }
+
+    businessVideoSpeakerMonitor =
+      requestAnimationFrame(
+        monitor
+      );
+  }
+
+  businessVideoSpeakerMonitor =
+    requestAnimationFrame(
+      monitor
+    );
+
+  console.log(
+    'Business video speaker monitor started.'
+  );
+}
+
+  // ----------------------------------------------------------
+  // Ignore tiny speaker changes
+  // ----------------------------------------------------------
+
+  const currentLevel =
+    speakerLevels.get(
+      businessVideoActiveSpeaker
+    ) || 0;
+
+  if (
+    businessVideoActiveSpeaker !==
+      loudestPeerId &&
+    loudestLevel <
+      currentLevel + 0.02
+  ) {
+    return;
+  }
+
+  setBusinessActiveSpeaker(
+    loudestPeerId
+  );
+}
 function setBusinessVideoView(mode) {
 
+
   const grid =
-    document.getElementById('business-video-grid');
+    document.getElementById(
+      'business-video-grid'
+    );
 
   if (!grid) {
     return;
   }
 
   businessVideoViewMode = mode;
-    const videoTiles =
-    document.querySelectorAll('.business-video-tile');
 
-  videoTiles.forEach(tile => {
+  const videoTiles =
+    document.querySelectorAll(
+      '.business-video-tile'
+    );
 
-    if (mode === 'grid') {
-
-      tile.classList.remove(
-        'w-full',
-        'min-h-[320px]'
-      );
-
-      tile.classList.add(
-        'min-h-[220px]'
-      );
-
-    } else {
-
-      tile.classList.remove(
-        'min-h-[220px]'
-      );
-
-      tile.classList.add(
-        'w-full',
-        'min-h-[320px]'
-      );
-
-    }
-
-  });
+  // ==========================================================
+  // GRID VIEW
+  // ==========================================================
 
   if (mode === 'grid') {
 
     grid.className =
       'flex-1 p-3 grid grid-cols-1 sm:grid-cols-2 gap-3 overflow-auto';
 
-  } else if (mode === 'tile') {
+    videoTiles.forEach(tile => {
+
+      tile.classList.remove(
+        'w-full',
+        'min-h-[320px]',
+        'business-video-speaker-main',
+        'business-video-speaker-thumb'
+      );
+
+      tile.classList.add(
+        'min-h-[220px]'
+      );
+
+    });
+
+  }
+
+  // ==========================================================
+  // TILE VIEW
+  // ==========================================================
+
+  else if (mode === 'tile') {
 
     grid.className =
       'flex-1 p-3 flex flex-col gap-3 overflow-auto';
+
+    videoTiles.forEach(tile => {
+
+      tile.classList.remove(
+        'min-h-[220px]',
+        'business-video-speaker-main',
+        'business-video-speaker-thumb'
+      );
+
+      tile.classList.add(
+        'w-full',
+        'min-h-[320px]'
+      );
+
+    });
+
+  }
+
+  // ==========================================================
+  // SPEAKER VIEW
+  // ==========================================================
+
+  else if (mode === 'speaker') {
+
+    applyBusinessSpeakerView();
 
   }
 
   updateBusinessVideoViewButtons();
 }
-
-
 function updateBusinessVideoViewButtons() {
 
   const gridButton =
-    document.getElementById('video-grid-view-btn');
+    document.getElementById(
+      'video-grid-view-btn'
+    );
 
   const tileButton =
-    document.getElementById('video-tile-view-btn');
+    document.getElementById(
+      'video-tile-view-btn'
+    );
 
-  if (!gridButton || !tileButton) {
+  const speakerButton =
+    document.getElementById(
+      'video-speaker-view-btn'
+    );
+
+  if (
+    !gridButton ||
+    !tileButton ||
+    !speakerButton
+  ) {
     return;
   }
 
-  if (businessVideoViewMode === 'grid') {
+  const inactiveClass =
+    'w-9 h-9 rounded-xl bg-white/10 hover:bg-white/15 text-white flex items-center justify-center';
 
-    gridButton.className =
-      'w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center';
+  const activeClass =
+    'w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center';
 
-    tileButton.className =
-      'w-9 h-9 rounded-xl bg-white/10 hover:bg-white/15 text-white flex items-center justify-center';
+  gridButton.className =
+    businessVideoViewMode === 'grid'
+      ? activeClass
+      : inactiveClass;
 
-  } else {
+  tileButton.className =
+    businessVideoViewMode === 'tile'
+      ? activeClass
+      : inactiveClass;
 
-    gridButton.className =
-      'w-9 h-9 rounded-xl bg-white/10 hover:bg-white/15 text-white flex items-center justify-center';
+  speakerButton.className =
+    businessVideoViewMode === 'speaker'
+      ? activeClass
+      : inactiveClass;
+}
+// ============================================================
+// ZOOM-LIKE SPEAKER VIEW
+// ============================================================
 
-    tileButton.className =
-      'w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center';
+function ensureBusinessSpeakerThumbnailBar() {
 
+  const grid =
+    document.getElementById(
+      'business-video-grid'
+    );
+
+  if (!grid) {
+    return null;
   }
+
+  let thumbnailBar =
+    document.getElementById(
+      'business-video-speaker-thumbnails'
+    );
+
+  if (!thumbnailBar) {
+
+    thumbnailBar =
+      document.createElement('div');
+
+    thumbnailBar.id =
+      'business-video-speaker-thumbnails';
+
+    thumbnailBar.className =
+      'w-full h-[110px] shrink-0 flex gap-3 overflow-x-auto overflow-y-hidden';
+
+    grid.appendChild(
+      thumbnailBar
+    );
+  }
+
+  return thumbnailBar;
 }
 
 
+// ============================================================
+// APPLY SPEAKER VIEW
+// ============================================================
+
+function applyBusinessSpeakerView() {
+
+  const grid =
+    document.getElementById(
+      'business-video-grid'
+    );
+
+  if (!grid) {
+    return;
+  }
+
+  const thumbnailBar =
+    ensureBusinessSpeakerThumbnailBar();
+
+  if (!thumbnailBar) {
+    return;
+  }
+
+  grid.className =
+    'flex-1 p-3 flex flex-col gap-3 overflow-hidden';
+
+  const tiles =
+    Array.from(
+      document.querySelectorAll(
+        '.business-video-tile'
+      )
+    );
+
+  if (!tiles.length) {
+    return;
+  }
+
+  const activeTile =
+    document.getElementById(
+      `video-tile-${businessVideoActiveSpeaker}`
+    );
+
+  // ----------------------------------------------------------
+  // MAIN SPEAKER
+  // ----------------------------------------------------------
+
+  if (activeTile) {
+
+    activeTile.classList.remove(
+      'business-video-speaker-thumb',
+      'min-h-[220px]'
+    );
+
+    activeTile.classList.add(
+      'business-video-speaker-main',
+      'w-full',
+      'flex-1',
+      'min-h-0'
+    );
+
+    grid.prepend(
+      activeTile
+    );
+  }
+
+  // ----------------------------------------------------------
+  // OTHER PARTICIPANTS
+  // ----------------------------------------------------------
+
+  thumbnailBar.innerHTML = '';
+
+  tiles.forEach(tile => {
+
+    if (
+      tile.id ===
+      `video-tile-${businessVideoActiveSpeaker}`
+    ) {
+      return;
+    }
+
+    tile.classList.remove(
+      'business-video-speaker-main',
+      'flex-1',
+      'min-h-0',
+      'w-full',
+      'min-h-[220px]'
+    );
+
+    tile.classList.add(
+      'business-video-speaker-thumb'
+    );
+
+    thumbnailBar.appendChild(
+      tile
+    );
+  });
+}
+
+
+// ============================================================
+// CHANGE ACTIVE SPEAKER
+// ============================================================
+
+function setBusinessActiveSpeaker(peerId) {
+
+  const tile =
+    document.getElementById(
+      `video-tile-${peerId}`
+    );
+
+  if (!tile) {
+    return;
+  }
+
+  if (
+    businessVideoActiveSpeaker === peerId
+  ) {
+    return;
+  }
+
+  businessVideoActiveSpeaker =
+    peerId;
+
+  console.log(
+    'Active video speaker:',
+    peerId
+  );
+
+  if (
+    businessVideoViewMode === 'speaker'
+  ) {
+
+    applyBusinessSpeakerView();
+
+  }
+}
 // ============================================================
 // OPEN / CLOSE VIDEO CONFERENCE
 // ============================================================
@@ -1186,7 +1668,18 @@ async function startBusinessVideoConference() {
       businessVideoStream,
       true
     );
+        // Create local video
+    createBusinessVideoTile(
+      'local',
+      userName,
+      businessVideoStream,
+      true
+    );
 
+    // Start automatic active-speaker detection
+    startBusinessVideoSpeakerMonitor();
+
+    updateBusinessVideoControls();
     updateBusinessVideoControls();
 
     // Tell server we joined video conference
@@ -1276,9 +1769,22 @@ function createBusinessVideoTile(
   tile.appendChild(video);
   tile.appendChild(nameBadge);
 
-  grid.appendChild(tile);
+    grid.appendChild(tile);
 
   video.play().catch(() => {});
+
+    // Connect this participant's audio to the speaker analyser
+  setupBusinessVideoAudioAnalyser(
+    peerId,
+    stream
+  );
+
+  // Refresh Speaker View when a new participant appears
+  if (
+    businessVideoViewMode === 'speaker'
+  ) {
+    applyBusinessSpeakerView();
+  }
 }
 
 
@@ -1678,7 +2184,55 @@ function removeBusinessVideoPeer(
   businessVideoPeers.delete(
     peerId
   );
+  // ==========================================================
+  // CLEAN UP SPEAKER AUDIO ANALYSER
+  // ==========================================================
 
+  const audioSource =
+    businessVideoAudioSources.get(
+      peerId
+    );
+
+  if (audioSource) {
+
+    try {
+      audioSource.disconnect();
+    } catch (error) {}
+
+  }
+
+  businessVideoAudioSources.delete(
+    peerId
+  );
+
+  businessVideoAudioAnalysers.delete(
+    peerId
+  );
+
+  businessVideoAudioData.delete(
+    peerId
+  );
+
+  // If the leaving participant was the active speaker,
+  // return Speaker View to the local user.
+  if (
+    businessVideoActiveSpeaker ===
+    peerId
+  ) {
+
+    businessVideoActiveSpeaker =
+      'local';
+
+    if (
+      businessVideoViewMode ===
+      'speaker'
+    ) {
+
+      applyBusinessSpeakerView();
+
+    }
+
+  }
 
   const tile =
     document.getElementById(
@@ -1725,6 +2279,59 @@ async function stopBusinessVideoConference() {
 
   businessVideoPeers.clear();
 
+  // ==========================================================
+  // STOP SPEAKER MONITOR
+  // ==========================================================
+
+  if (businessVideoSpeakerMonitor) {
+
+    cancelAnimationFrame(
+      businessVideoSpeakerMonitor
+    );
+
+    businessVideoSpeakerMonitor =
+      null;
+
+  }
+
+  // ==========================================================
+  // CLEAN UP ALL SPEAKER AUDIO ANALYSERS
+  // ==========================================================
+
+  businessVideoAudioSources.forEach(
+    (audioSource) => {
+
+      try {
+        audioSource.disconnect();
+      } catch (error) {}
+
+    }
+  );
+
+  businessVideoAudioSources.clear();
+
+  businessVideoAudioAnalysers.clear();
+
+  businessVideoAudioData.clear();
+
+  // ==========================================================
+  // CLOSE SPEAKER AUDIO CONTEXT
+  // ==========================================================
+
+  if (businessVideoAudioContext) {
+
+    businessVideoAudioContext
+      .close()
+      .catch(() => {});
+
+    businessVideoAudioContext =
+      null;
+
+  }
+
+  // Reset active speaker
+  businessVideoActiveSpeaker =
+    'local';
 
   // Stop camera + microphone
   if (businessVideoStream) {
