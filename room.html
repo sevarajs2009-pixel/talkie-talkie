@@ -1040,6 +1040,7 @@ let businessVideoViewMode = 'grid';
 // ============================================================
 
 let businessVideoActiveSpeaker = 'local';
+let businessVideoManualSpeakerLock = false;
 
 let businessVideoAudioContext = null;
 let businessVideoAudioAnalysers = new Map();
@@ -1202,99 +1203,106 @@ function measureBusinessVideoSpeakerAudio() {
 
   return speakerLevels;
 }
+
 // ============================================================
-// FIND LOUDest BUSINESS VIDEO SPEAKER
+// FIND LOUDEST BUSINESS VIDEO SPEAKER
 // ============================================================
 
 function detectBusinessVideoActiveSpeaker() {
 
-  const speakerLevels =
-    measureBusinessVideoSpeakerAudio();
-
-  if (!speakerLevels.size) {
-    return;
-  }
-
-  const SPEAKING_THRESHOLD = 0.035;
-
-  let loudestPeerId = null;
-  let loudestLevel = 0;
-
-  speakerLevels.forEach(
-    (level, peerId) => {
-
-      if (
-        level > SPEAKING_THRESHOLD &&
-        level > loudestLevel
-      ) {
-
-        loudestLevel = level;
-        loudestPeerId = peerId;
-
-      }
+    // Manual speaker selection has priority
+    if (businessVideoManualSpeakerLock) {
+        return;
     }
-  );
 
-  if (!loudestPeerId) {
-    return;
-  }
+    const speakerLevels =
+        measureBusinessVideoSpeakerAudio();
 
-  // ============================================================
+    if (!speakerLevels.size) {
+        return;
+    }
+
+    const SPEAKING_THRESHOLD = 0.035;
+
+    let loudestPeerId = null;
+    let loudestLevel = 0;
+
+    speakerLevels.forEach(
+        (level, peerId) => {
+
+            if (
+                level > SPEAKING_THRESHOLD &&
+                level > loudestLevel
+            ) {
+                loudestLevel = level;
+                loudestPeerId = peerId;
+            }
+
+        }
+    );
+
+    if (!loudestPeerId) {
+        return;
+    }
+
+    // ----------------------------------------------------------
+    // Ignore tiny speaker changes
+    // ----------------------------------------------------------
+
+    const currentLevel =
+        speakerLevels.get(
+            businessVideoActiveSpeaker
+        ) || 0;
+
+    if (
+        businessVideoActiveSpeaker !==
+            loudestPeerId &&
+        loudestLevel <
+            currentLevel + 0.02
+    ) {
+        return;
+    }
+
+    setBusinessActiveSpeaker(
+        loudestPeerId
+    );
+}
+
+
+// ============================================================
 // START BUSINESS VIDEO SPEAKER MONITOR
 // ============================================================
 
 function startBusinessVideoSpeakerMonitor() {
 
-  if (businessVideoSpeakerMonitor) {
-    return;
-  }
+    if (businessVideoSpeakerMonitor) {
+        return;
+    }
 
-  function monitor() {
+    function monitor() {
 
-    if (
-      businessVideoViewMode === 'speaker'
-    ) {
-      detectBusinessVideoActiveSpeaker();
+        if (
+            businessVideoViewMode === 'speaker'
+        ) {
+            detectBusinessVideoActiveSpeaker();
+        }
+
+        businessVideoSpeakerMonitor =
+            requestAnimationFrame(
+                monitor
+            );
     }
 
     businessVideoSpeakerMonitor =
-      requestAnimationFrame(
-        monitor
-      );
-  }
+        requestAnimationFrame(
+            monitor
+        );
 
-  businessVideoSpeakerMonitor =
-    requestAnimationFrame(
-      monitor
+    console.log(
+        'Business video speaker monitor started.'
     );
-
-  console.log(
-    'Business video speaker monitor started.'
-  );
 }
 
-  // ----------------------------------------------------------
-  // Ignore tiny speaker changes
-  // ----------------------------------------------------------
-
-  const currentLevel =
-    speakerLevels.get(
-      businessVideoActiveSpeaker
-    ) || 0;
-
-  if (
-    businessVideoActiveSpeaker !==
-      loudestPeerId &&
-    loudestLevel <
-      currentLevel + 0.02
-  ) {
-    return;
-  }
-
-  setBusinessActiveSpeaker(
-    loudestPeerId
-  );
-}
 function setBusinessVideoView(mode) {
 
 
@@ -1732,6 +1740,23 @@ function createBusinessVideoTile(
   }
 
   const tile = document.createElement('div');
+  tile.addEventListener('click', () => {
+
+    // Only manual selection in Speaker View
+    if (businessVideoViewMode !== 'speaker') {
+        return;
+    }
+
+    // Select this participant
+    businessVideoManualSpeakerLock = true;
+
+    setBusinessActiveSpeaker(peerId);
+
+    console.log(
+        'Business video manual speaker selected:',
+        peerId
+    );
+});
 
   tile.id = `video-tile-${peerId}`;
   
