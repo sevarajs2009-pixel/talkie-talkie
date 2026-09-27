@@ -3259,7 +3259,9 @@ case 'VIDEO_ERROR':
       const isAdmin = role.toLowerCase() === 'admin';
       const isFamilyRoom = roomType === 'family';
 
-      membersList.innerHTML = connectedMembers.map(m => {
+      membersList.innerHTML = connectedMembers
+  .filter(m => m.userName !== userName)
+  .map(m => {
         const canClick = isAdmin && isFamilyRoom;
         const isRed = activeSosUsers[m.userName];
         const redClass = isRed ? 'sos-active-danger' : '';

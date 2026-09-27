@@ -90,69 +90,7 @@ window.firebaseDeleteDoc = deleteDoc;
       // Logged-in User Data State
       const [loggedInUser, setLoggedInUser] = React.useState('');
       const [loggedInEmail, setLoggedInEmail] = React.useState('');
-      const [roomVisibility, setRoomVisibility] = React.useState('private');
-      const handleRoomVisibilityChange = async (newVisibility) => {
-  setRoomVisibility(newVisibility);
-
-  try {
-    const user = window.firebaseAuth?.currentUser;
-
-    if (!user) {
-      console.error("No logged-in Firebase user found.");
-      return;
-    }
-
-    // Save the user's Public / Private preference
-    await window.firebaseSetDoc(
-      window.firebaseDoc(
-        window.firebaseDb,
-        "users",
-        user.uid
-      ),
-      {
-        roomVisibility: newVisibility
-      },
-      { merge: true }
-    );
-
-    // Load all rooms owned by this user
-    const roomsRef = window.firebaseCollection(
-      window.firebaseDb,
-      "users",
-      user.uid,
-      "managedRooms"
-    );
-
-    const roomsSnapshot = await window.firebaseGetDocs(roomsRef);
-
-    // Update every existing room in the global directory
-    for (const roomDoc of roomsSnapshot.docs) {
-      const roomData = roomDoc.data();
-
-      await window.firebaseSetDoc(
-        window.firebaseDoc(
-          window.firebaseDb,
-          "rooms",
-          roomData.roomId
-        ),
-        {
-          isPublic: newVisibility === "public"
-        },
-        { merge: true }
-      );
-    }
-
-    console.log(
-      `All existing rooms changed to ${newVisibility}.`
-    );
-
-  } catch (error) {
-    console.error(
-      "Failed to update room visibility:",
-      error
-    );
-  }
-};
+  
       const [clientIp, setClientIp] = React.useState('Fetching IP...');
 
       // Profile Data State - Loaded from Firebase Firestore
@@ -196,7 +134,7 @@ const unsubscribe = window.firebaseOnAuthStateChanged(
   setLoggedInUser(profile.username || '');
 setLoggedInEmail(profile.email || user.email || '');
 
-setRoomVisibility(profile.roomVisibility || 'private');
+
 
 setProfileData((prev) => ({
   ...prev,
@@ -727,21 +665,20 @@ try {
   );
 
   return;
-}
-        const roomObj = {
-          userName: username,
-          email: email.trim(),
-          name: roomName,
-          roomId: roomId.trim(),
-          secureKey: secureKey.trim(),
-          status: 'Active',
-          isPublic: roomVisibility === 'public',
-          members: 1,
-          type: type,
-          participants: [username],
-          ipAddress: clientIp,
-          createdAt: new Date().toLocaleString()
-        };
+}const roomObj = {
+  userName: username,
+  email: email.trim(),
+  name: roomName,
+  roomId: roomId.trim(),
+  secureKey: secureKey.trim(),
+  status: 'Active',
+  members: 1,
+  type: type,
+  isPublic: false,
+  participants: [username],
+  ipAddress: clientIp,
+  createdAt: new Date().toLocaleString()
+};
 
         if (isExceeding) {
           setActiveActionModal(null); // Closes the Create Room modal immediately so payment modal is visible
@@ -791,6 +728,7 @@ await window.firebaseSetDoc(
     members: roomObj.members,
     ownerUid: user.uid,
     userName: roomObj.userName,
+    
     createdAt: roomObj.createdAt
   }
 );
@@ -1072,6 +1010,89 @@ const handleGuestJoin = async (e) => {
   }
 };
 
+    const updateRoomVisibility = async (room, makePublic) => {
+  const user = window.firebaseAuth?.currentUser;
+
+  if (!user) {
+    alert("You must be logged in.");
+    return;
+  }
+
+  const previousRoom = { ...room };
+
+  const updatedRoom = {
+    ...room,
+    isPublic: makePublic === true
+  };
+
+  // Update the UI immediately
+  setManagedRooms(prev =>
+    prev.map(existingRoom =>
+      existingRoom.roomId === updatedRoom.roomId
+        ? updatedRoom
+        : existingRoom
+    )
+  );
+
+  try {
+    // Save this specific room to the owner's managed rooms
+    await window.firebaseSetDoc(
+      window.firebaseDoc(
+        window.firebaseDb,
+        "users",
+        user.uid,
+        "managedRooms",
+        updatedRoom.roomId
+      ),
+      updatedRoom
+    );
+
+    // Update this specific room in the public room directory
+    await window.firebaseSetDoc(
+      window.firebaseDoc(
+        window.firebaseDb,
+        "rooms",
+        updatedRoom.roomId
+      ),
+      {
+        roomId: updatedRoom.roomId,
+        name: updatedRoom.name,
+        type: updatedRoom.type,
+        status: updatedRoom.status,
+        isPublic: updatedRoom.isPublic,
+        members: updatedRoom.members,
+        ownerUid: user.uid,
+        userName: updatedRoom.userName,
+        createdAt: updatedRoom.createdAt,
+        participants: updatedRoom.participants || [],
+        membersList: updatedRoom.membersList || []
+      },
+      { merge: true }
+    );
+
+    console.log(
+      "Room visibility updated:",
+      updatedRoom.name,
+      updatedRoom.isPublic ? "PUBLIC" : "PRIVATE"
+    );
+
+  } catch (error) {
+    console.error("Failed to update room visibility:", error);
+
+    // Roll back the UI if Firebase save fails
+    setManagedRooms(prev =>
+      prev.map(existingRoom =>
+        existingRoom.roomId === previousRoom.roomId
+          ? previousRoom
+          : existingRoom
+      )
+    );
+
+    alert(
+      "Unable to save room visibility. The previous setting has been restored."
+    );
+  }
+};
       const handleUpdateManagedRoom = async (e) => {
     e.preventDefault();
 
@@ -1100,18 +1121,12 @@ const handleGuestJoin = async (e) => {
             ? globalRoomSnapshot.data()
             : {};
 
-        // IMPORTANT:
-        // Preserve the existing Public / Private status
-        const preservedIsPublic =
-            existingGlobalRoom.isPublic === true ||
-            managingRoom.isPublic === true;
-
         const updatedRoom = {
-            ...managingRoom,
-            isPublic: preservedIsPublic,
-            participants: managingRoom.participants || [],
-            membersList: managingRoom.membersList || []
-        };
+    ...managingRoom,
+    isPublic: managingRoom.isPublic === true,
+    participants: managingRoom.participants || [],
+    membersList: managingRoom.membersList || []
+};
 
         // Save updated room to user's managed rooms
         await window.firebaseSetDoc(
@@ -1126,24 +1141,27 @@ const handleGuestJoin = async (e) => {
         );
 
         // Update global room used by Public Search
-        await window.firebaseSetDoc(
-            globalRoomRef,
-            {
-                roomId: updatedRoom.roomId,
-                name: updatedRoom.name,
-                type: updatedRoom.type,
-                status: updatedRoom.status,
-                isPublic: preservedIsPublic,
-                members: updatedRoom.members,
-                ownerUid: user.uid,
-                userName: updatedRoom.userName,
-                createdAt: updatedRoom.createdAt,
-                participants: updatedRoom.participants,
-                membersList: updatedRoom.membersList
-            },
-            { merge: true }
-        );
-
+          await window.firebaseSetDoc(
+    window.firebaseDoc(
+      window.firebaseDb,
+      'rooms',
+      updatedRoom.roomId
+    ),
+    {
+      roomId: updatedRoom.roomId,
+      name: updatedRoom.name,
+      type: updatedRoom.type,
+      status: updatedRoom.status,
+      isPublic: updatedRoom.isPublic === true,
+      members: updatedRoom.members,
+      ownerUid: user.uid,
+      userName: updatedRoom.userName,
+      createdAt: updatedRoom.createdAt,
+      participants: updatedRoom.participants,
+      membersList: updatedRoom.membersList
+    },
+    { merge: true }
+  );
         // Update dashboard immediately
         setManagedRooms(prev =>
             prev.map(room =>
@@ -1160,7 +1178,7 @@ const handleGuestJoin = async (e) => {
             updatedRoom.roomId,
             updatedRoom.name,
             "Public:",
-            preservedIsPublic
+            updatedRoom.isPublic
         );
 
     } catch (error) {
@@ -1189,7 +1207,23 @@ const handleGuestJoin = async (e) => {
         const user = window.firebaseAuth?.currentUser;
         if (!user) throw new Error('You must be logged in.');
         await window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, 'users', user.uid, 'managedRooms', updatedRoom.roomId), updatedRoom);
-        await window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, 'rooms', updatedRoom.roomId), { roomId: updatedRoom.roomId, name: updatedRoom.name, type: updatedRoom.type, status: updatedRoom.status, members: updatedRoom.members, ownerUid: user.uid, userName: updatedRoom.userName, createdAt: updatedRoom.createdAt, participants: updatedRoom.participants, membersList: updatedRoom.membersList });
+        await window.firebaseSetDoc(
+  window.firebaseDoc(window.firebaseDb, 'rooms', updatedRoom.roomId),
+  {
+    roomId: updatedRoom.roomId,
+    name: updatedRoom.name,
+    type: updatedRoom.type,
+    status: updatedRoom.status,
+    isPublic: updatedRoom.isPublic === true,
+    members: updatedRoom.members,
+    ownerUid: user.uid,
+    userName: updatedRoom.userName,
+    createdAt: updatedRoom.createdAt,
+    participants: updatedRoom.participants,
+    membersList: updatedRoom.membersList
+  },
+  { merge: true }
+);
         setManagedRooms(prev => prev.map(room => room.roomId === updatedRoom.roomId ? updatedRoom : room));
         setMemberModalRoom(updatedRoom);
       };
@@ -1324,7 +1358,104 @@ const handleGuestJoin = async (e) => {
                         <span className="material-symbols-outlined text-[16px]">add</span> New Room
                       </button>
                     </div>
-                    
+                    <div className="bg-dark-800 border border-dark-border rounded-3xl p-5 flex flex-col gap-4 shadow-lg">
+    
+  <div className="flex items-center justify-between">
+    <div className="flex items-center gap-2.5">
+      <div className="w-8 h-8 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-400">
+        <span className="material-symbols-outlined text-base">public</span>
+      </div>
+
+      <div>
+        <h3 className="text-sm font-bold text-white">Public Room Search</h3>
+        <p className="text-[10px] text-slate-500">
+          Search public rooms by room name
+        </p>
+      </div>
+    </div>
+
+    <span className="text-[10px] font-bold tracking-widest px-2.5 py-0.5 rounded-full bg-brand-500/10 text-brand-400 uppercase">
+      PUBLIC
+    </span>
+  </div>
+
+  <div className="flex gap-2">
+    <input
+      type="text"
+      value={publicRoomSearch}
+      onChange={(e) => setPublicRoomSearch(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          searchPublicRooms();
+        }
+      }}
+      placeholder="Enter room name..."
+      className="flex-1 px-3.5 py-2.5 rounded-xl border border-dark-border bg-dark-900 text-white text-xs outline-none focus:border-brand-500"
+    />
+
+    <button
+      type="button"
+      onClick={searchPublicRooms}
+      disabled={publicRoomSearchLoading}
+      className="px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-400 text-white text-xs font-bold transition-all disabled:opacity-50"
+    >
+      {publicRoomSearchLoading ? 'Searching...' : 'Search'}
+    </button>
+  </div>
+
+  {publicRoomSearchStatus && (
+    <p className="text-[11px] text-slate-400">
+      {publicRoomSearchStatus}
+    </p>
+  )}
+
+  {publicRoomResults.length > 0 && (
+    <div className="flex flex-col gap-2">
+      {publicRoomResults.map((room) => (
+        <div
+          key={room.roomId}
+          className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-dark-900 border border-dark-border"
+        >
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-white truncate">
+              {room.name}
+            </p>
+
+            <p className="text-[10px] text-slate-500">
+              {room.type} · {room.members || 0}/6 members
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setGuestJoinData((prev) => ({
+                ...prev,
+                roomId: room.roomId
+              }));
+
+              setTimeout(() => {
+                const guestPortal = document.getElementById("guest-access-portal");
+
+                if (guestPortal) {
+                  guestPortal.scrollIntoView({
+                    behavior: "smooth",
+                    block: "center"
+                  });
+                }
+              }, 50);
+            }}
+            className="shrink-0 px-3 py-2 rounded-xl bg-brand-500 hover:bg-brand-400 text-white text-[10px] font-bold transition-all"
+          >
+            Join
+          </button>
+        </div>
+      ))}
+    </div>
+  )}
+
+</div>
                     <div className="grid grid-cols-2 gap-3">
                       <button 
                         onClick={() => { 
@@ -1368,106 +1499,8 @@ const handleGuestJoin = async (e) => {
                       <p className="text-[11px]">Family and Business rooms have separate member lists. Free capacity is 6 members per room.</p>
                     </div>
                   </div>
-                  {roomVisibility === 'public' && (
-  <div className="bg-dark-800 border border-dark-border rounded-3xl p-5 flex flex-col gap-4 shadow-lg">
-    
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-400">
-          <span className="material-symbols-outlined text-base">public</span>
-        </div>
-
-        <div>
-          <h3 className="text-sm font-bold text-white">Public Room Search</h3>
-          <p className="text-[10px] text-slate-500">
-            Search public rooms by room name
-          </p>
-        </div>
-      </div>
-
-      <span className="text-[10px] font-bold tracking-widest px-2.5 py-0.5 rounded-full bg-brand-500/10 text-brand-400 uppercase">
-        PUBLIC
-      </span>
-    </div>
-
-    <div className="flex gap-2">
-      <input
-        type="text"
-        value={publicRoomSearch}
-        onChange={(e) => setPublicRoomSearch(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            searchPublicRooms();
-          }
-        }}
-        placeholder="Enter room name..."
-        className="flex-1 px-3.5 py-2.5 rounded-xl border border-dark-border bg-dark-900 text-white text-xs outline-none focus:border-brand-500"
-      />
-
-      <button
-        type="button"
-        onClick={searchPublicRooms}
-        disabled={publicRoomSearchLoading}
-        className="px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-400 text-white text-xs font-bold transition-all disabled:opacity-50"
-      >
-        {publicRoomSearchLoading ? 'Searching...' : 'Search'}
-      </button>
-    </div>
-
-    {publicRoomSearchStatus && (
-      <p className="text-[11px] text-slate-400">
-        {publicRoomSearchStatus}
-      </p>
-    )}
-
-    {publicRoomResults.length > 0 && (
-      <div className="flex flex-col gap-2">
-        {publicRoomResults.map((room) => (
-          <div
-            key={room.roomId}
-            className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-dark-900 border border-dark-border"
-          >
-            <div className="min-w-0">
-              <p className="text-xs font-bold text-white truncate">
-                {room.name}
-              </p>
-
-              <p className="text-[10px] text-slate-500">
-                {room.type} · {room.members || 0}/6 members
-              </p>
-            </div>
-
-            <button
-  type="button"
-  onClick={() => {
-    setGuestJoinData((prev) => ({
-      ...prev,
-      roomId: room.roomId
-    }));
-
-    setTimeout(() => {
-      const guestPortal = document.getElementById("guest-access-portal");
-
-      if (guestPortal) {
-        guestPortal.scrollIntoView({
-          behavior: "smooth",
-          block: "center"
-        });
-      }
-    }, 50);
-  }}
-  className="shrink-0 px-3 py-2 rounded-xl bg-brand-500 hover:bg-brand-400 text-white text-[10px] font-bold transition-all"
->
-  Join
-</button>
-          </div>
-        ))}
-      </div>
-    )}
-
-  </div>
-)}
+                  
+  
                   <div
   id="guest-access-portal"
   className="bg-dark-800 border border-dark-border rounded-3xl p-5 flex flex-col gap-4 shadow-lg"
@@ -1481,31 +1514,7 @@ const handleGuestJoin = async (e) => {
   <h3 className="text-sm font-bold text-white">Guest Access Portal</h3>
 </div>
 
-<div className="flex items-center gap-1 p-1 rounded-xl bg-dark-900 border border-dark-border">
-  <button
-    type="button"
-    onClick={() => handleRoomVisibilityChange('private')}
-    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
-      roomVisibility === 'private'
-        ? 'bg-slate-700 text-white shadow'
-        : 'text-slate-500 hover:text-slate-300'
-    }`}
-  >
-    Private
-  </button>
 
-  <button
-    type="button"
-    onClick={() => handleRoomVisibilityChange('public')}
-    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
-      roomVisibility === 'public'
-        ? 'bg-brand-500 text-white shadow'
-        : 'text-slate-500 hover:text-slate-300'
-    }`}
-  >
-    Public
-  </button>
-</div>
                       <span className="text-[10px] font-bold tracking-widest px-2.5 py-0.5 rounded-full bg-slate-700/50 text-slate-300 uppercase">JOINER</span>
                     </div>
 
@@ -1598,6 +1607,49 @@ const handleGuestJoin = async (e) => {
                               <div className="flex justify-between"><span>Host Creator:</span> <strong className="text-slate-300">{room.userName}</strong></div>
                               <div className="flex justify-between"><span>IP Address:</span> <strong className="text-slate-300 font-mono">{room.ipAddress || clientIp}</strong></div>
                             </div>
+                            <div className="flex flex-col gap-1.5">
+  <div className="flex items-center justify-between">
+    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+      Room Visibility
+    </span>
+
+    <span
+      className={`text-[9px] font-bold tracking-wider px-2 py-0.5 rounded-full ${
+        room.isPublic === true
+          ? 'bg-brand-500/10 text-brand-400 border border-brand-500/20'
+          : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'
+      }`}
+    >
+      {room.isPublic === true ? 'PUBLIC' : 'PRIVATE'}
+    </span>
+  </div>
+
+  <div className="flex items-center gap-1 p-1 rounded-xl bg-dark-900 border border-dark-border">
+    <button
+      type="button"
+      onClick={() => updateRoomVisibility(room, false)}
+      className={`flex-1 px-3 py-2 rounded-lg text-[10px] font-bold transition ${
+        room.isPublic !== true
+          ? 'bg-slate-700 text-white shadow'
+          : 'text-slate-400 hover:text-white'
+      }`}
+    >
+      Private
+    </button>
+
+    <button
+      type="button"
+      onClick={() => updateRoomVisibility(room, true)}
+      className={`flex-1 px-3 py-2 rounded-lg text-[10px] font-bold transition ${
+        room.isPublic === true
+          ? 'bg-brand-500 text-white shadow'
+          : 'text-slate-400 hover:text-white'
+      }`}
+    >
+      Public
+    </button>
+  </div>
+</div>
                             <div className="grid grid-cols-2 gap-2">
                               <button onClick={() => setManagingRoom({...room})} className="bg-dark-700 hover:bg-dark-600 text-slate-200 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer">
                                 <span className="material-symbols-outlined text-[16px]">settings</span> Manage
@@ -2262,6 +2314,52 @@ const handleGuestJoin = async (e) => {
                       onChange={e => setManagingRoom({...managingRoom, secureKey: e.target.value})} 
                       required 
                     />
+                  </div>
+
+                                    <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                      ROOM VISIBILITY
+                    </label>
+
+                    <div className="flex items-center gap-1 p-1 rounded-xl bg-dark-900 border border-dark-border">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setManagingRoom({
+                            ...managingRoom,
+                            isPublic: false
+                          })
+                        }
+                        className={`flex-1 px-3 py-2 rounded-lg text-xs font-bold transition ${
+                          !managingRoom.isPublic
+                            ? 'bg-slate-700 text-white shadow'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Private
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setManagingRoom({
+                            ...managingRoom,
+                            isPublic: true
+                          })
+                        }
+                        className={`flex-1 px-3 py-2 rounded-lg text-xs font-bold transition ${
+                          managingRoom.isPublic
+                            ? 'bg-brand-500 text-white shadow'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Public
+                      </button>
+                    </div>
+
+                    <p className="text-[10px] text-slate-500 leading-relaxed">
+                      Public rooms can appear in public search, but the room passcode is still required to join.
+                    </p>
                   </div>
 
                   <button type="submit" className="w-full bg-brand-600 hover:bg-brand-500 text-white py-3 rounded-xl font-bold text-xs mt-2 shadow-lg shadow-brand-600/25 transition-all cursor-pointer">
