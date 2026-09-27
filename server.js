@@ -1694,14 +1694,13 @@ if (data.type === 'CHAT_SEND') {
     });
 
     for (const client of roomSockets) {
-      if (
-        client.readyState === WebSocket.OPEN &&
-        client.userRole &&
-        client.userRole.toLowerCase() === 'admin'
-      ) {
-        client.send(payload);
-      }
-    }
+  if (
+    client !== ws &&
+    client.readyState === WebSocket.OPEN
+  ) {
+    client.send(payload);
+  }
+}
   }
 }
       if (data.type === 'START_TALKING' || data.type === 'STOP_TALKING') {

@@ -2895,7 +2895,11 @@ function updateBusinessVideoControls() {
             }
           },
           (err) => console.warn('GPS Error:', err.message),
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+          {
+  enableHighAccuracy: false,
+  timeout: 5000,
+  maximumAge: 30000
+}
         );
       }
     }
@@ -2962,11 +2966,20 @@ ws = new WebSocket(
       source.connect(audioContext.destination);
 
       const currentTime = audioContext.currentTime;
-      if (nextPlayTime < currentTime) {
-        nextPlayTime = currentTime;
-      }
-      source.start(nextPlayTime);
-      nextPlayTime += audioBuffer.duration;
+
+// Never allow the playback queue to fall too far behind real time.
+if (nextPlayTime < currentTime) {
+  nextPlayTime = currentTime;
+}
+
+// If the queue has accumulated too much latency,
+// reset it instead of playing several seconds of old audio.
+if (nextPlayTime - currentTime > 0.25) {
+  nextPlayTime = currentTime;
+}
+
+source.start(nextPlayTime);
+nextPlayTime += audioBuffer.duration;
     }
 
     function triggerSOS() {
