@@ -2902,7 +2902,7 @@ function updateBusinessVideoControls() {
 
     async function initRoomConnection() {
       try {
-    const protocol = 'wss://';
+    const protocol = 'ws://';
   const { auth } = await import("./firebase.js");
 
 await auth.authStateReady();
@@ -2917,9 +2917,9 @@ if (!firebaseUser) {
 
 const idToken = await firebaseUser.getIdToken();
 
-  ws = new WebSocket(
-    `${protocol}talkie-talkie-server.onrender.com/ws/room?token=${encodeURIComponent(idToken)}`
-  );
+ws = new WebSocket(
+  `${protocol}${location.host}/ws/room?token=${encodeURIComponent(idToken)}`
+);
 
         ws.onopen = () => {
           document.getElementById('connection-status').textContent = 'Connected';
@@ -3259,9 +3259,8 @@ case 'VIDEO_ERROR':
 
       const isAdmin = role.toLowerCase() === 'admin';
       const isFamilyRoom = roomType === 'family';
-
+      
       membersList.innerHTML = connectedMembers
-  .filter(m => m.userName !== userName)
   .map(m => {
         const canClick = isAdmin && isFamilyRoom;
         const isRed = activeSosUsers[m.userName];

@@ -642,6 +642,46 @@ function isAdminInRoom(roomId) {
 
   return false;
 }
+// ============================================================
+// REMOVE DUPLICATE CONNECTION FOR THE SAME FIREBASE USER
+// One Firebase user = one active WebSocket connection per room.
+// This prevents duplicate Admin/Guest entries after refresh.
+// ============================================================
+function removeExistingUserSocket(roomId, firebaseUid) {
+  const roomSockets = activeRoomSockets.get(roomId);
+
+  if (!roomSockets || !firebaseUid) {
+    return;
+  }
+
+  for (const client of roomSockets) {
+    if (
+      client !== null &&
+      client !== undefined &&
+      client.firebaseUid === firebaseUid &&
+      client.readyState === WebSocket.OPEN
+    ) {
+      console.log(
+        `Replacing existing WebSocket | UID: ${firebaseUid} | Room: ${roomId}`
+      );
+
+      // Prevent old socket's close handler from treating this
+      // as the Admin actually leaving.
+      client.isReplacedConnection = true;
+
+      roomSockets.delete(client);
+
+      try {
+        client.close(1000, 'Replaced by a new connection');
+      } catch (error) {
+        console.error(
+          'Error closing replaced WebSocket:',
+          error.message
+        );
+      }
+    }
+  }
+}
 
 
 // ============================================================
@@ -1127,6 +1167,7 @@ wss.on('connection', (ws) => {
   ws.userRole = null;
   ws.joinedAt = null;
   ws.isSosMuted = false;
+  ws.isReplacedConnection = false;
   // Business Video Conference
 ws.videoPeerId = crypto.randomUUID();
 ws.videoConferenceActive = false;
@@ -1268,6 +1309,12 @@ if (!isRoomOwner) {
 // UPGRADED   = HIGH CAPACITY
 // ============================================================
 
+// Remove an older connection from the same Firebase user.
+// This is important when the user refreshes the room page.
+removeExistingUserSocket(
+  requestedRoomId,
+  firebaseUid
+);
 const currentMemberCount =
   getRoomMemberCount(requestedRoomId);
 
@@ -1742,26 +1789,42 @@ if (data.type === 'CHAT_SEND') {
 
     ws.videoConferenceActive = false;
   }
-
     if (ws.roomId && activeRoomSockets.has(ws.roomId)) {
-      const roomSockets = activeRoomSockets.get(ws.roomId);
-      roomSockets.delete(ws);
 
-      if (ws.userRole && ws.userRole.toLowerCase() === 'admin') {
-        const payload = JSON.stringify({ type: 'ADMIN_LEFT' });
-        for (const client of roomSockets) {
-          if (client.readyState === WebSocket.OPEN) {
-            client.send(payload);
-            client.close();
-          }
-        }
-        activeRoomSockets.delete(ws.roomId);
-        roomSettings.delete(ws.roomId);
+  const roomSockets = activeRoomSockets.get(ws.roomId);
+
+  // This connection was replaced by a newer connection
+  // from the same Firebase user.
+  if (ws.isReplacedConnection) {
+    console.log(
+      `Old WebSocket closed after replacement | UID: ${ws.firebaseUid} | Room: ${ws.roomId}`
+    );
+    return;
+  }
+
+  roomSockets.delete(ws);
+
+  if (ws.userRole && ws.userRole.toLowerCase() === 'admin') {
+
+    const payload = JSON.stringify({
+      type: 'ADMIN_LEFT'
+    });
+
+    for (const client of roomSockets) {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(payload);
+        client.close();
       }
-      
-      updateRoomGuestsList(ws.roomId);
-      broadcastRoomMembers(ws.roomId);
     }
+
+    activeRoomSockets.delete(ws.roomId);
+    roomSettings.delete(ws.roomId);
+  }
+
+  updateRoomGuestsList(ws.roomId);
+  broadcastRoomMembers(ws.roomId);
+}
+    
   });
 });
 app.get('/room.html', (req, res) => {
