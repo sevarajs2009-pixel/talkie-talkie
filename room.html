@@ -2902,7 +2902,7 @@ function updateBusinessVideoControls() {
 
     async function initRoomConnection() {
       try {
-    const protocol = 'ws://';
+    const protocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
   const { auth } = await import("./firebase.js");
 
 await auth.authStateReady();
