@@ -2877,33 +2877,89 @@ function updateBusinessVideoControls() {
         await audioContext.resume();
       }
     }
+let gpsTimer = null;
+let gpsActive = false;
 
-    function startGPSWatch() {
-      if (roomType === 'business') return;
+function sendCurrentLocation() {
+  if (roomType === 'business') return;
 
-      if ('geolocation' in navigator) {
-        navigator.geolocation.watchPosition(
-          (pos) => {
-            const { latitude, longitude } = pos.coords;
-            if (ws && ws.readyState === WebSocket.OPEN) {
-              ws.send(JSON.stringify({
-                type: 'LOCATION_UPDATE',
-                roomId,
-                userName,
-                location: { latitude, longitude }
-              }));
-            }
-          },
-          (err) => console.warn('GPS Error:', err.message),
-          {
-  enableHighAccuracy: false,
-  timeout: 5000,
-  maximumAge: 30000
-}
-        );
+  if (!('geolocation' in navigator)) {
+    console.warn('GPS is not supported on this device.');
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const { latitude, longitude, accuracy } = pos.coords;
+
+      const currentLocation = {
+        latitude,
+        longitude
+      };
+
+      // Keep our own location locally
+      // so Admin can also view it.
+      memberLocations[userName] = currentLocation;
+
+      console.log('GPS LOCATION FOUND:', {
+        latitude,
+        longitude,
+        accuracy
+      });
+
+      // Update the map immediately if this user
+      // is currently selected.
+      if (selectedGuestName === userName) {
+        updateMapPosition(userName, currentLocation);
       }
-    }
 
+      // Send location to the room.
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        console.log('SENDING LOCATION_UPDATE:', userName);
+
+        ws.send(JSON.stringify({
+          type: 'LOCATION_UPDATE',
+          roomId,
+          userName,
+          location: currentLocation
+        }));
+      }
+    },
+    (err) => {
+      console.warn('GPS Error:', err.message);
+    },
+    {
+      enableHighAccuracy: false,
+      timeout: 15000,
+      maximumAge: 60000
+    }
+  );
+}
+
+function startGPSWatch() {
+  if (roomType === 'business') return;
+
+  if (gpsActive) return;
+
+  gpsActive = true;
+
+  // Get the first location immediately.
+  sendCurrentLocation();
+
+  // Then update once every 30 seconds.
+  gpsTimer = setInterval(() => {
+    sendCurrentLocation();
+  }, 30000);
+}
+
+function stopGPSWatch() {
+  gpsActive = false;
+
+  if (gpsTimer) {
+    clearInterval(gpsTimer);
+    gpsTimer = null;
+  }
+}
     async function initRoomConnection() {
       try {
     const protocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
@@ -3313,51 +3369,78 @@ case 'VIDEO_ERROR':
     }
 
     function openGuestMap(targetUserName, targetRole) {
-      if (role.toLowerCase() !== 'admin' || roomType === 'business') return;
+  if (role.toLowerCase() !== 'admin' || roomType === 'business') return;
 
-      selectedGuestName = targetUserName;
-      document.getElementById('map-guest-name').textContent = `${targetUserName} (${targetRole})`;
-      document.getElementById('map-modal').classList.remove('hidden');
+  selectedGuestName = targetUserName;
 
-      const loc = memberLocations[targetUserName];
+  document.getElementById('map-guest-name').textContent =
+    `${targetUserName} (${targetRole})`;
 
-      if (!leafletMap) {
-  const initialLat = loc?.latitude ?? 0;
-  const initialLng = loc?.longitude ?? 0;
+  document.getElementById('map-modal').classList.remove('hidden');
 
-  leafletMap = L.map('map').setView([initialLat, initialLng], 15);
+  const loc = memberLocations[targetUserName];
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; OpenStreetMap'
-  }).addTo(leafletMap);
+  if (!leafletMap) {
+    const initialLat = loc?.latitude ?? 0;
+    const initialLng = loc?.longitude ?? 0;
+
+    leafletMap = L.map('map').setView(
+      [initialLat, initialLng],
+      loc ? 15 : 2
+    );
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap'
+    }).addTo(leafletMap);
+  }
+
+  // Remove the previous person's marker.
+  if (mapMarker) {
+    mapMarker.remove();
+    mapMarker = null;
+  }
+
+  setTimeout(() => {
+    if (selectedGuestName !== targetUserName) return;
+
+    leafletMap.invalidateSize();
+
+    const latestLoc = memberLocations[targetUserName];
+
+    if (latestLoc) {
+      updateMapPosition(targetUserName, latestLoc);
+    } else {
+      document.getElementById('map-coords-info').textContent =
+        'Waiting for location signal...';
+    }
+  }, 200);
 }
 
-      setTimeout(() => {
-        leafletMap.invalidateSize();
-        if (loc) {
-          updateMapPosition(targetUserName, loc);
-        } else {
-          document.getElementById('map-coords-info').textContent = 'Waiting for guest location signal...';
-        }
-      }, 200);
-    }
-
     function updateMapPosition(targetUserName, loc) {
-      if (!leafletMap || !loc || roomType === 'business') return;
-      
-      const latLng = [loc.latitude, loc.longitude];
-      leafletMap.setView(latLng, 15);
+  if (!leafletMap || !loc || roomType === 'business') return;
 
-      if (mapMarker) {
-        mapMarker.setLatLng(latLng);
-      } else {
-        mapMarker = L.marker(latLng).addTo(leafletMap);
-      }
+  const latLng = [loc.latitude, loc.longitude];
 
-      mapMarker.bindPopup(`<b>${targetUserName}</b><br>Lat: ${loc.latitude.toFixed(4)}, Lng: ${loc.longitude.toFixed(4)}`).openPopup();
-      document.getElementById('map-coords-info').textContent = `Latitude: ${loc.latitude.toFixed(5)}, Longitude: ${loc.longitude.toFixed(5)}`;
-    }
+  leafletMap.setView(latLng, 15);
+
+  if (!mapMarker) {
+    mapMarker = L.marker(latLng).addTo(leafletMap);
+  } else {
+    mapMarker.setLatLng(latLng);
+  }
+
+  mapMarker
+    .bindPopup(
+      `<b>${targetUserName}</b><br>` +
+      `Lat: ${loc.latitude.toFixed(4)}, ` +
+      `Lng: ${loc.longitude.toFixed(4)}`
+    )
+    .openPopup();
+
+  document.getElementById('map-coords-info').textContent =
+    `Latitude: ${loc.latitude.toFixed(5)}, Longitude: ${loc.longitude.toFixed(5)}`;
+}
 
     function closeMapModal() {
       document.getElementById('map-modal').classList.add('hidden');
