@@ -2939,18 +2939,108 @@ function sendCurrentLocation() {
 function startGPSWatch() {
   if (roomType === 'business') return;
 
-  if (gpsActive) return;
+  if ('geolocation' in navigator) {
 
-  gpsActive = true;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude, accuracy } = pos.coords;
 
-  // Get the first location immediately.
-  sendCurrentLocation();
+        const currentLocation = {
+          latitude,
+          longitude
+        };
 
-  // Then update once every 30 seconds.
-  gpsTimer = setInterval(() => {
-    sendCurrentLocation();
-  }, 30000);
+        memberLocations[userName] = currentLocation;
+
+        console.log('GPS LOCATION FOUND:', {
+          latitude,
+          longitude,
+          accuracy
+        });
+
+        if (selectedGuestName === userName) {
+          updateMapPosition(userName, currentLocation);
+        }
+
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          console.log('SENDING LOCATION_UPDATE:', userName);
+
+          ws.send(JSON.stringify({
+            type: 'LOCATION_UPDATE',
+            roomId,
+            userName,
+            location: currentLocation
+          }));
+        } else {
+          console.warn('GPS FOUND BUT WEBSOCKET NOT OPEN');
+        }
+      },
+      (err) => {
+        console.warn('GPS Error:', err.message);
+      },
+      {
+        enableHighAccuracy: false,
+        timeout: 15000,
+        maximumAge: 60000
+      }
+    );
+
+    if (gpsTimer) {
+      clearInterval(gpsTimer);
+    }
+
+    gpsTimer = setInterval(() => {
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude, accuracy } = pos.coords;
+
+          const currentLocation = {
+            latitude,
+            longitude
+          };
+
+          memberLocations[userName] = currentLocation;
+
+          console.log('GPS LOCATION FOUND:', {
+            latitude,
+            longitude,
+            accuracy
+          });
+
+          if (selectedGuestName === userName) {
+            updateMapPosition(userName, currentLocation);
+          }
+
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            console.log('SENDING LOCATION_UPDATE:', userName);
+
+            ws.send(JSON.stringify({
+              type: 'LOCATION_UPDATE',
+              roomId,
+              userName,
+              location: currentLocation
+            }));
+          }
+        },
+        (err) => {
+          console.warn('GPS Error:', err.message);
+        },
+        {
+          enableHighAccuracy: false,
+          timeout: 15000,
+          maximumAge: 60000
+        }
+      );
+
+    }, 30000);
+
+  } else {
+    console.warn('GPS is not supported on this device.');
+  }
 }
+
+
 
 function stopGPSWatch() {
   gpsActive = false;
