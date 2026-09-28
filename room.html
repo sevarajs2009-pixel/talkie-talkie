@@ -1170,6 +1170,50 @@ function setupBusinessVideoAudioAnalyser(
 
   }
 }
+
+// ============================================================
+// BUSINESS VIDEO AUDIO ANALYSER POWER CONTROL
+// ============================================================
+
+async function startBusinessVideoAudioAnalyser() {
+
+  if (!businessVideoAudioContext) {
+    return;
+  }
+
+  if (businessVideoAudioContext.state === 'suspended') {
+    try {
+      await businessVideoAudioContext.resume();
+      console.log('Business video audio analyser resumed.');
+    } catch (error) {
+      console.warn(
+        'Could not resume business video audio analyser:',
+        error
+      );
+    }
+  }
+}
+
+
+async function stopBusinessVideoAudioAnalyser() {
+
+  if (!businessVideoAudioContext) {
+    return;
+  }
+
+  if (businessVideoAudioContext.state === 'running') {
+    try {
+      await businessVideoAudioContext.suspend();
+      console.log('Business video audio analyser suspended.');
+    } catch (error) {
+      console.warn(
+        'Could not suspend business video audio analyser:',
+        error
+      );
+    }
+  }
+}
+
 // ============================================================
 // MEASURE BUSINESS VIDEO SPEAKER AUDIO
 // ============================================================
@@ -1299,7 +1343,11 @@ function startBusinessVideoSpeakerMonitor() {
         return;
     }
 
-    function monitor() {
+    if (businessVideoViewMode !== 'speaker') {
+        return;
+    }
+
+    businessVideoSpeakerMonitor = setInterval(() => {
 
         if (
             businessVideoViewMode === 'speaker'
@@ -1307,20 +1355,26 @@ function startBusinessVideoSpeakerMonitor() {
             detectBusinessVideoActiveSpeaker();
         }
 
-        businessVideoSpeakerMonitor =
-            requestAnimationFrame(
-                monitor
-            );
-    }
-
-    businessVideoSpeakerMonitor =
-        requestAnimationFrame(
-            monitor
-        );
+    }, 250);
 
     console.log(
         'Business video speaker monitor started.'
     );
+}
+function stopBusinessVideoSpeakerMonitor() {
+
+    if (businessVideoSpeakerMonitor) {
+
+        clearInterval(
+            businessVideoSpeakerMonitor
+        );
+
+        businessVideoSpeakerMonitor = null;
+
+        console.log(
+            'Business video speaker monitor stopped.'
+        );
+    }
 }
 
 function setBusinessVideoView(mode) {
@@ -1336,6 +1390,18 @@ function setBusinessVideoView(mode) {
   }
 
   businessVideoViewMode = mode;
+
+if (mode === 'speaker') {
+
+    startBusinessVideoSpeakerMonitor();
+    startBusinessVideoAudioAnalyser();
+
+} else {
+
+    stopBusinessVideoSpeakerMonitor();
+    stopBusinessVideoAudioAnalyser();
+
+}
 
   const videoTiles =
     document.querySelectorAll(
