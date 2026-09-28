@@ -344,12 +344,12 @@ body.page-hidden .animate-pulse {
     </section>
 
     <!-- Active Room Participants Card -->
-    <section class="flex-grow flex flex-col min-h-[160px]">
+    <section class="flex flex-col min-h-[130px]">
       <div class="flex items-center justify-between mb-2.5 px-1">
         <h3 id="active-members-count" class="text-xs font-bold uppercase tracking-wider text-slate-400">Active Members (0)</h3>
         <span class="material-symbols-outlined text-slate-400 text-[18px]">group</span>
       </div>
-      <div class="bg-surface-card/80 backdrop-blur-md rounded-2xl border border-surface-border/80 shadow-lg shadow-black/30 overflow-hidden flex-grow">
+      <div class="bg-surface-card/80 backdrop-blur-md rounded-2xl border border-surface-border/80 shadow-lg shadow-black/30 overflow-hidden h-[130px]">
         <ul id="members-list" class="divide-y divide-surface-border/40 max-h-48 overflow-y-auto"></ul>
       </div>
     </section>
@@ -385,7 +385,7 @@ body.page-hidden .animate-pulse {
 </section>
 
     <!-- Interactive PTT Section -->
-    <section class="py-4 flex flex-col items-center justify-center relative my-auto icon-3d-wrapper">
+    <section class="py-4 flex flex-col items-center justify-center relative icon-3d-wrapper">
       <div class="relative flex items-center justify-center">
         <div id="ambient-glow" class="absolute w-56 h-56 rounded-full blur-3xl transition-all duration-700 bg-emerald-500/20"></div>
         <button id="pttButton" class="w-44 h-44 rounded-full bg-gradient-to-b from-emerald-400 via-emerald-600 to-teal-800 text-white flex flex-col items-center justify-center gap-2 transition-all select-none z-10 ptt-ring ptt-3d-button focus:outline-none border-4 border-slate-900/80 active:scale-90">
@@ -396,7 +396,7 @@ body.page-hidden .animate-pulse {
     </section>
 
     <!-- Controls -->
-    <section class="grid grid-cols-3 gap-2 mt-auto">
+    <section class="grid grid-cols-3 gap-2">
       <button onclick="triggerSOS()" class="h-11 rounded-xl bg-red-600 hover:bg-red-700 text-white border border-red-500/30 flex items-center justify-center gap-1.5 transition-all font-bold text-xs active:scale-95 shadow-lg shadow-red-600/30">
         <span class="material-symbols-outlined text-[18px]">sos</span> SOS
       </button>
@@ -553,8 +553,8 @@ body.page-hidden .animate-pulse {
   title="Speaker View"
 >
   <span class="material-symbols-outlined text-[18px]">
-    present_to_all
-  </span>
+  record_voice_over
+</span>
 </button>
 
     </div>
@@ -3335,15 +3335,42 @@ nextPlayTime += audioBuffer.duration;
           break;
 
         case 'ROOM_STATE_UPDATE':
-          connectedMembers = data.members || [];
-          if (data.sosMode) {
-            sosMode = data.sosMode;
-            const activeRadio = document.querySelector(`input[name="sosModeRadio"][value="${sosMode}"]`);
-            if (activeRadio) activeRadio.checked = true;
-          }
-          renderMembersList();
-          renderUserBannerOffButton();
-          break;
+  connectedMembers = data.members || [];
+
+  if (data.sosMode) {
+    sosMode = data.sosMode;
+
+    const activeRadio = document.querySelector(
+      `input[name="sosModeRadio"][value="${sosMode}"]`
+    );
+
+    if (activeRadio) {
+      activeRadio.checked = true;
+    }
+  }
+
+  // ==========================================================
+  // BUSINESS CHAT — RESET WHEN ROOM BECOMES EMPTY
+  // ==========================================================
+
+  if (
+    roomType === 'business' &&
+    connectedMembers.length === 0
+  ) {
+    businessChatMessages = [];
+    businessChatUnreadCount = 0;
+
+    updateBusinessChatUnreadBadge();
+    renderBusinessChat();
+
+    console.log(
+      'All members left the Business room — Team Chat refreshed.'
+    );
+  }
+
+  renderMembersList();
+  renderUserBannerOffButton();
+  break;
 
         case 'LOCATION_BROADCAST':
           if (roomType === 'family') {
