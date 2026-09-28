@@ -3091,6 +3091,11 @@ ws = new WebSocket(
         };
 
         audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const micTrack = audioStream.getAudioTracks()[0];
+
+if (micTrack) {
+  micTrack.enabled = false;
+}
       } catch (err) {
         console.error('Audio/WS Error:', err);
       }
@@ -3561,10 +3566,18 @@ case 'VIDEO_ERROR':
     const ambientGlow = document.getElementById('ambient-glow');
 
     async function startTransmitting() {
-      await initAudioContext();
-      if (!ws || ws.readyState !== WebSocket.OPEN || !audioStream || isTransmitting) return;
+  await initAudioContext();
 
-      isTransmitting = true;
+  if (!ws || ws.readyState !== WebSocket.OPEN || !audioStream || isTransmitting) return;
+
+  // Turn microphone ON only while transmitting
+  const micTrack = audioStream.getAudioTracks()[0];
+
+  if (micTrack) {
+    micTrack.enabled = true;
+  }
+
+  isTransmitting = true;
       const theme = themeMap[activeColorTheme];
       
       pttBtn.className = pttBtn.className.replace(theme.pttBg, 'bg-gradient-to-b from-rose-500 via-rose-600 to-red-800').replace('ptt-ring', 'ptt-transmitting');
@@ -3603,11 +3616,20 @@ case 'VIDEO_ERROR':
         scriptProcessor = null;
       }
       if (mediaStreamSource) {
-        mediaStreamSource.disconnect();
-        mediaStreamSource = null;
-      }
+  mediaStreamSource.disconnect();
+  mediaStreamSource = null;
+}
 
-      const theme = themeMap[activeColorTheme];
+// Turn microphone OFF when PTT is released
+if (audioStream) {
+  const micTrack = audioStream.getAudioTracks()[0];
+
+  if (micTrack) {
+    micTrack.enabled = false;
+  }
+}
+
+const theme = themeMap[activeColorTheme];
       
       pttBtn.className = pttBtn.className.replace('bg-gradient-to-b from-rose-500 via-rose-600 to-red-800', theme.pttBg).replace('ptt-transmitting', 'ptt-ring');
       pttIcon.style.fontVariationSettings = "'FILL' 1, 'wght' 500";
