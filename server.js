@@ -585,6 +585,17 @@ function addBusinessChatMessage(roomId, message) {
 
   roomChatHistory.set(key, history);
 }
+function clearBusinessChatHistory(roomId) {
+  const key = String(roomId);
+
+  if (roomChatHistory.has(key)) {
+    roomChatHistory.delete(key);
+
+    console.log(
+      `Business Team Chat cleared — room is empty | Room: ${key}`
+    );
+  }
+}
 
 function broadcastBusinessChat(roomId, payload) {
   const roomSockets = activeRoomSockets.get(roomId);
@@ -1800,28 +1811,47 @@ if (data.type === 'CHAT_SEND') {
     );
     return;
   }
+roomSockets.delete(ws);
 
-  roomSockets.delete(ws);
+if (ws.userRole && ws.userRole.toLowerCase() === 'admin') {
 
-  if (ws.userRole && ws.userRole.toLowerCase() === 'admin') {
+  const payload = JSON.stringify({
+    type: 'ADMIN_LEFT'
+  });
 
-    const payload = JSON.stringify({
-      type: 'ADMIN_LEFT'
-    });
-
-    for (const client of roomSockets) {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(payload);
-        client.close();
-      }
+  for (const client of roomSockets) {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(payload);
+      client.close();
     }
-
-    activeRoomSockets.delete(ws.roomId);
-    roomSettings.delete(ws.roomId);
   }
 
-  updateRoomGuestsList(ws.roomId);
-  broadcastRoomMembers(ws.roomId);
+  // The Admin leaving forces the remaining users
+  // out of the room as well.
+  // Therefore this Business room is now considered empty.
+  if (isBusinessRoomType(ws.roomType)) {
+    clearBusinessChatHistory(ws.roomId);
+  }
+
+  activeRoomSockets.delete(ws.roomId);
+  roomSettings.delete(ws.roomId);
+
+} else {
+
+  // ============================================================
+  // BUSINESS CHAT — CLEAR ONLY WHEN THE LAST MEMBER LEAVES
+  // ============================================================
+
+  if (
+    isBusinessRoomType(ws.roomType) &&
+    roomSockets.size === 0
+  ) {
+    clearBusinessChatHistory(ws.roomId);
+  }
+}
+
+updateRoomGuestsList(ws.roomId);
+broadcastRoomMembers(ws.roomId);
 }
     
   });
