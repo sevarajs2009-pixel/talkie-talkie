@@ -87,7 +87,9 @@
     }
     
     .ptt-ring {
-      animation: float-3d-ptt 5s ease-in-out infinite alternate, pulse-ring 2s infinite cubic-bezier(0.66, 0, 0, 1);
+      .ptt-ring {
+  animation: float-3d-ptt 5s ease-in-out infinite alternate;
+}
     }
     @keyframes pulse-ring {
       to { box-shadow: 0 0 0 28px transparent; }
@@ -109,10 +111,10 @@
       80% { transform: translateX(4px) rotate(1deg); }
     }
     .sos-active-danger {
-      background-color: rgba(225, 29, 72, 0.45) !important;
-      border-color: rgba(244, 63, 94, 0.9) !important;
-      animation: sos-shake 0.4s ease-in-out infinite !important;
-    }
+  background-color: rgba(225, 29, 72, 0.45) !important;
+  border-color: rgba(244, 63, 94, 0.9) !important;
+  animation: sos-shake 1.2s ease-in-out infinite !important;
+}
     
     ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
@@ -138,6 +140,35 @@
         border-top-right-radius: 1.5rem;
       }
     }
+  
+/* ============================================================
+   BATTERY-FRIENDLY VISUAL POWER CONTROL
+   ============================================================ */
+
+/* Pause decorative animations when TalkieTalkie is not visible */
+body.page-hidden .ptt-3d-button,
+body.page-hidden .ptt-ring,
+body.page-hidden #ambient-glow,
+body.page-hidden .icon-3d-badge,
+body.page-hidden .animate-pulse {
+  animation-play-state: paused !important;
+}
+
+/* Respect the device/user reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .ptt-3d-button,
+  .ptt-ring,
+  #ambient-glow,
+  .icon-3d-badge,
+  .animate-pulse {
+    animation: none !important;
+  }
+
+  * {
+    scroll-behavior: auto !important;
+  }
+}
+</style>
   </style>
 </head>
 <body id="room-body" class="theme-emerald text-slate-100 min-h-screen flex flex-col relative md:max-w-md md:mx-auto shadow-2xl overflow-x-hidden overflow-y-auto md:overflow-hidden selection:bg-brand-500/30">
@@ -356,7 +387,7 @@
     <!-- Interactive PTT Section -->
     <section class="py-4 flex flex-col items-center justify-center relative my-auto icon-3d-wrapper">
       <div class="relative flex items-center justify-center">
-        <div id="ambient-glow" class="absolute w-56 h-56 rounded-full blur-3xl transition-all duration-700 animate-pulse bg-emerald-500/20"></div>
+        <div id="ambient-glow" class="absolute w-56 h-56 rounded-full blur-3xl transition-all duration-700 bg-emerald-500/20"></div>
         <button id="pttButton" class="w-44 h-44 rounded-full bg-gradient-to-b from-emerald-400 via-emerald-600 to-teal-800 text-white flex flex-col items-center justify-center gap-2 transition-all select-none z-10 ptt-ring ptt-3d-button focus:outline-none border-4 border-slate-900/80 active:scale-90">
           <span class="material-symbols-outlined text-[56px] ptt-3d-icon" style="font-variation-settings: 'FILL' 1, 'wght' 500;">mic</span>
           <span id="ptt-label" class="text-xs font-extrabold tracking-widest uppercase" style="transform: translateZ(15px);">Hold to Speak</span>
@@ -529,17 +560,15 @@
     </div>
 
     <!-- Close Button -->
-    <button
-      onclick="toggleBusinessVideo(false)"
-    <!-- Close Button -->
-    <button
-      onclick="toggleBusinessVideo(false)"
-      class="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/15 text-white flex items-center justify-center"
-    >
-      <span class="material-symbols-outlined text-lg">
-        close
-      </span>
-    </button>
+<!-- Close Button -->
+<button
+  onclick="toggleBusinessVideo(false)"
+  class="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/15 text-white flex items-center justify-center"
+>
+  <span class="material-symbols-outlined text-lg">
+    close
+  </span>
+</button>
 
   </div>
 
@@ -1762,19 +1791,13 @@ async function startBusinessVideoConference() {
       businessVideoStream,
       true
     );
-        // Create local video
-    createBusinessVideoTile(
-      'local',
-      userName,
-      businessVideoStream,
-      true
-    );
+      
 
     // Start automatic active-speaker detection
     startBusinessVideoSpeakerMonitor();
 
     updateBusinessVideoControls();
-    updateBusinessVideoControls();
+  
 
     // Tell server we joined video conference
     ws.send(JSON.stringify({
@@ -2406,17 +2429,15 @@ async function stopBusinessVideoConference() {
   // ==========================================================
   // STOP SPEAKER MONITOR
   // ==========================================================
+      if (businessVideoSpeakerMonitor) {
 
-  if (businessVideoSpeakerMonitor) {
+  clearInterval(
+    businessVideoSpeakerMonitor
+  );
 
-    cancelAnimationFrame(
-      businessVideoSpeakerMonitor
-    );
-
-    businessVideoSpeakerMonitor =
-      null;
-
-  }
+  businessVideoSpeakerMonitor =
+    null;
+}
 
   // ==========================================================
   // CLEAN UP ALL SPEAKER AUDIO ANALYSERS
@@ -3701,7 +3722,7 @@ const theme = themeMap[activeColorTheme];
       pttIcon.style.fontVariationSettings = "'FILL' 1, 'wght' 500";
       pttLabel.textContent = "Hold to Speak";
       
-      ambientGlow.className = `absolute w-56 h-56 rounded-full blur-3xl transition-all duration-700 animate-pulse ${theme.glow}`;
+      ambientGlow.className = `absolute w-56 h-56 rounded-full blur-3xl transition-all duration-700 ${theme.glow}`;
 
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'STOP_TALKING', roomId, userName }));
@@ -3723,7 +3744,34 @@ const theme = themeMap[activeColorTheme];
     function showRoomInfo() {
       alert(`Room: ${roomName}\nType: ${roomType.toUpperCase()}\nRole: ${role}\nUser: ${userName}`);
     }
+    // ============================================================
+// BATTERY-FRIENDLY PAGE VISIBILITY CONTROL
+// ============================================================
 
+function updateVisualPowerState() {
+
+  if (document.hidden) {
+    document.body.classList.add('page-hidden');
+
+    console.log(
+      'Visual animations paused — page hidden.'
+    );
+
+  } else {
+    document.body.classList.remove('page-hidden');
+
+    console.log(
+      'Visual animations resumed — page visible.'
+    );
+  }
+}
+
+document.addEventListener(
+  'visibilitychange',
+  updateVisualPowerState
+);
+
+updateVisualPowerState();
     window.addEventListener('DOMContentLoaded', initRoomConnection);
   </script>
 </body>
