@@ -21,6 +21,9 @@ const signupForm = document.getElementById("signup-form");
 const signupButton = signupForm.querySelector('button[type="submit"]');
 let pendingSignupData = null;
 
+// Google signup mode
+let googleSignupUser = null;
+
 
 
 
@@ -59,13 +62,18 @@ passwordInput.addEventListener("input", () => {
     updatePasswordRequirement(reqLowercase, hasLowercase);
     updatePasswordRequirement(reqNumber, hasNumber);
     updatePasswordRequirement(reqSpecial, hasSpecial);
+    // Google users do not need a password
+if (googleSignupUser) {
+    signupButton.disabled = false;
+} else {
     signupButton.disabled = !(
-    hasLength &&
-    hasUppercase &&
-    hasLowercase &&
-    hasNumber &&
-    hasSpecial
-);
+        hasLength &&
+        hasUppercase &&
+        hasLowercase &&
+        hasNumber &&
+        hasSpecial
+    );
+}
 });
 
 
@@ -83,19 +91,27 @@ signupForm.addEventListener("submit", async (e) => {
     const country = document.getElementById("country").value;
     const password = document.getElementById("password").value;
 
-    // Validate fields
-    if (
-        !fullName ||
-        !username ||
-        !email ||
-        !age ||
-        !gender ||
-        !country ||
-        !password
-    ) {
-        alert("Please fill out all required fields.");
-        return;
-    }
+    // ========================================
+// VALIDATE FIELDS
+// ========================================
+
+if (
+    !fullName ||
+    !username ||
+    !email ||
+    !age ||
+    !gender ||
+    !country
+) {
+    alert("Please fill out all required fields.");
+    return;
+}
+
+// Password is required only for normal signup
+if (!googleSignupUser && !password) {
+    alert("Please enter a password.");
+    return;
+}
 
     // Age validation
     if (age < 13) {
@@ -104,15 +120,15 @@ signupForm.addEventListener("submit", async (e) => {
     }
 
     // Save signup information temporarily
-      pendingSignupData = {
-        fullName,
-        username,
-        email,
-        age,
-        gender,
-        country,
-        password
-    };
+pendingSignupData = {
+    fullName,
+    username,
+    email,
+    age,
+    gender,
+    country,
+    password
+};
 
     signupButton.disabled = true;
     signupButton.textContent = "Creating Account...";
@@ -153,20 +169,39 @@ async function createFirebaseAccount() {
         // ========================================
         // CREATE AUTH ACCOUNT
         // ========================================
+// ========================================
+// CREATE / USE AUTH ACCOUNT
+// ========================================
 
-        const userCredential =
-            await createUserWithEmailAndPassword(
-                auth,
-                email,
-                password
-            );
+let user;
 
-        const user = userCredential.user;
+if (googleSignupUser) {
 
-        console.log(
-            "Firebase user created:",
-            user.uid
+    // Google account is already authenticated
+    user = googleSignupUser;
+
+    console.log(
+        "Using existing Google Firebase user:",
+        user.uid
+    );
+
+} else {
+
+    // Normal email/password signup
+    const userCredential =
+        await createUserWithEmailAndPassword(
+            auth,
+            email,
+            password
         );
+
+    user = userCredential.user;
+
+    console.log(
+        "Firebase user created:",
+        user.uid
+    );
+}
 
 
         // ========================================
@@ -268,6 +303,9 @@ if (googleSignupButton) {
 
             const provider = new GoogleAuthProvider();
 
+            provider.addScope("profile");
+            provider.addScope("email");
+
             const result = await signInWithPopup(
                 auth,
                 provider
@@ -280,24 +318,62 @@ if (googleSignupButton) {
                 user.uid
             );
 
+            console.log("Google name:", user.displayName);
+            console.log("Google email:", user.email);
+            console.log("Google photo:", user.photoURL);
+
             // Check whether TalkieTalkie profile already exists
             const userDoc = await getDoc(
                 doc(db, "users", user.uid)
             );
 
+            // ========================================
+            // EXISTING TALKIETALKIE USER
+            // ========================================
+
             if (userDoc.exists()) {
 
-                // Existing TalkieTalkie account
                 alert("Login successful!");
 
-                window.location.href = "/dashboard.html";
+                window.location.href =
+                    "/dashboard.html";
 
                 return;
             }
 
-            // New Google user
+            // ========================================
+            // NEW GOOGLE USER
+            // ========================================
+
+            googleSignupUser = user;
+
+            // Fill information Google already provides
+            const fullNameInput =
+                document.getElementById("fullName");
+
+            const emailInput =
+                document.getElementById("email");
+
+            if (fullNameInput && user.displayName) {
+                fullNameInput.value =
+                    user.displayName;
+            }
+
+            if (emailInput && user.email) {
+                emailInput.value =
+                    user.email;
+
+                // Email came from Google.
+                // User does not need to type it again.
+                emailInput.readOnly = true;
+            }
+
             alert(
-                "Google account connected. Please complete your TalkieTalkie profile."
+                "Google account connected! Please complete your TalkieTalkie profile."
+            );
+
+            console.log(
+                "New Google user ready for profile completion."
             );
 
         } catch (error) {
@@ -312,7 +388,9 @@ if (googleSignupButton) {
                 "auth/popup-closed-by-user"
             ) {
 
-                alert("Google sign-in was cancelled.");
+                alert(
+                    "Google sign-in was cancelled."
+                );
 
             } else if (
                 error.code ===
@@ -321,6 +399,24 @@ if (googleSignupButton) {
 
                 alert(
                     "An account already exists with this email. Please use your existing login method."
+                );
+
+            } else if (
+                error.code ===
+                "auth/popup-blocked"
+            ) {
+
+                alert(
+                    "Google sign-in popup was blocked. Please allow popups for this site."
+                );
+
+            } else if (
+                error.code ===
+                "auth/unauthorized-domain"
+            ) {
+
+                alert(
+                    "Google sign-in is not enabled for this website domain in Firebase."
                 );
 
             } else {
@@ -334,6 +430,7 @@ if (googleSignupButton) {
         } finally {
 
             googleSignupButton.disabled = false;
+
             googleSignupButton.textContent =
                 "Continue with Google";
         }
