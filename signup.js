@@ -127,27 +127,84 @@ if (!googleSignupButton) {
 
 
                 // ========================================
-                // NEW GOOGLE USER
-                // ========================================
+// NEW GOOGLE USER
+// ========================================
 
-                console.log(
-                    "No Talkie Talkie account found."
-                );
-
-
-                // Do NOT create a Firestore profile.
-                // Do NOT redirect to Dashboard.
-                //
-                // Sign out immediately so the Google
-                // authentication does not remain active.
-
-                await signOut(auth);
+console.log(
+    "No Talkie Talkie account found."
+);
 
 
-                alert(
-                    "You need to create a Talkie Talkie account to use Talkie Talkie."
-                );
+// Tell the user that the account will be created
+alert(
+    "You need to create a Talkie Talkie account to use Talkie Talkie."
+);
 
+
+// ========================================
+// CREATE TALKIE TALKIE PROFILE
+// ========================================
+
+// Get Google name
+const googleName =
+    (user.displayName || "").trim();
+
+// Get username from Google name.
+// If Google name is unavailable,
+// use the part before @ from the email.
+const emailUsername =
+    (user.email || "")
+        .split("@")[0]
+        .trim();
+
+const username =
+    googleName ||
+    emailUsername ||
+    "User";
+
+const fullName =
+    googleName ||
+    emailUsername ||
+    "Google User";
+
+
+// Create Talkie Talkie profile
+await setDoc(
+    userRef,
+    {
+        uid: user.uid,
+        fullName: fullName,
+        username: username,
+        email: user.email || "",
+
+        // These will be filled later
+        age: "",
+        gender: "",
+        country: ""
+    }
+);
+
+
+// ========================================
+// ACCOUNT CREATED SUCCESSFULLY
+// ========================================
+
+console.log(
+    "New Talkie Talkie Google account created."
+);
+
+
+alert(
+    "Your Talkie Talkie account has been created successfully!"
+);
+
+
+// User is still authenticated,
+// so go directly to Dashboard.
+window.location.href =
+    "/dashboard.html";
+
+return;
 
                 // Stay on Signup page.
 
