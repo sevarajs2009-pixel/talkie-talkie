@@ -101,6 +101,33 @@ window.firebaseDeleteDoc = deleteDoc;
   gender: '',
   country: ''
 });
+
+const saveProfileField = async (field, value) => {
+  try {
+    const user = window.firebaseAuth?.currentUser;
+
+    if (!user) {
+      console.error("No logged-in Firebase user.");
+      return;
+    }
+
+    await window.firebaseSetDoc(
+      window.firebaseDoc(
+        window.firebaseDb,
+        "users",
+        user.uid
+      ),
+      {
+        [field]: value
+      },
+      { merge: true }
+    );
+
+    console.log(`Profile ${field} saved successfully.`);
+  } catch (error) {
+    console.error(`Failed to save profile ${field}:`, error);
+  }
+};
       // Verify Firebase session and load user profile data
       React.useEffect(() => {
         if (!window.firebaseAuth || !window.firebaseOnAuthStateChanged) {
@@ -1916,37 +1943,82 @@ const handleGuestJoin = async (e) => {
   />
 </div>
 
-                    <div className="w-full grid grid-cols-3 gap-2">
-                      <div className="flex flex-col gap-1 bg-dark-900/60 border border-dark-border rounded-2xl p-2.5">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Age</label>
-                        <input 
-                          type="text" 
-                          value={profileData.age} 
-                          readOnly
-                          className="bg-transparent text-slate-300 text-xs font-semibold outline-none w-full cursor-not-allowed select-none text-center"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1 bg-dark-900/60 border border-dark-border rounded-2xl p-2.5">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Gender</label>
-                        <input 
-                          type="text" 
-                          value={profileData.gender} 
-                          readOnly
-                          className="bg-transparent text-slate-300 text-xs font-semibold outline-none w-full cursor-not-allowed select-none text-center truncate"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1 bg-dark-900/60 border border-dark-border rounded-2xl p-2.5">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Country</label>
-                        <input 
-                          type="text" 
-                          value={profileData.country} 
-                          readOnly
-                          className="bg-transparent text-slate-300 text-xs font-semibold outline-none w-full cursor-not-allowed select-none text-center truncate"
-                        />
-                      </div>
-                    </div>
+    <div className="w-full grid grid-cols-3 gap-2">
 
-                    <div className="w-full grid grid-cols-2 gap-3">
+  {/* AGE */}
+  <div className="flex flex-col gap-1 bg-dark-900/60 border border-dark-border rounded-2xl p-2.5">
+    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+      Age
+    </label>
+
+    <input
+      type="text"
+      inputMode="numeric"
+      value={profileData.age ?? ""}
+      onChange={(e) => {
+        const value = e.target.value.replace(/\D/g, "");
+
+        setProfileData(prev => ({
+          ...prev,
+          age: value
+        }));
+      }}
+      onBlur={() => {
+        saveProfileField("age", profileData.age);
+      }}
+      className="bg-transparent text-slate-300 text-xs font-semibold outline-none w-full text-center"
+      placeholder="Age"
+    />
+  </div>
+
+  {/* GENDER */}
+  <div className="flex flex-col gap-1 bg-dark-900/60 border border-dark-border rounded-2xl p-2.5">
+    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+      Gender
+    </label>
+
+    <input
+      type="text"
+      value={profileData.gender ?? ""}
+      onChange={(e) => {
+        setProfileData(prev => ({
+          ...prev,
+          gender: e.target.value
+        }));
+      }}
+      onBlur={() => {
+        saveProfileField("gender", profileData.gender);
+      }}
+      className="bg-transparent text-slate-300 text-xs font-semibold outline-none w-full text-center truncate"
+      placeholder="Gender"
+    />
+  </div>
+
+  {/* COUNTRY */}
+  <div className="flex flex-col gap-1 bg-dark-900/60 border border-dark-border rounded-2xl p-2.5">
+    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+      Country
+    </label>
+
+    <input
+      type="text"
+      value={profileData.country ?? ""}
+      onChange={(e) => {
+        setProfileData(prev => ({
+          ...prev,
+          country: e.target.value
+        }));
+      }}
+      onBlur={() => {
+        saveProfileField("country", profileData.country);
+      }}
+      className="bg-transparent text-slate-300 text-xs font-semibold outline-none w-full text-center truncate"
+      placeholder="Country"
+    />
+  </div>
+
+</div>
+                      <div className="w-full grid grid-cols-2 gap-3">
                       <div className="bg-brand-500/10 border border-brand-500/20 rounded-2xl p-3 flex flex-col items-center text-center">
                         <span className="material-symbols-outlined text-brand-400 text-lg mb-1">family_home</span>
                         <span className="text-xl font-extrabold text-white">
