@@ -2,7 +2,8 @@ import { auth, app } from "./firebase.js";
 
 import {
     GoogleAuthProvider,
-    signInWithPopup
+    signInWithPopup,
+    signOut
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 
 import {
@@ -83,16 +84,6 @@ if (!googleSignupButton) {
                     user.uid
                 );
 
-                console.log(
-                    "Google name:",
-                    user.displayName
-                );
-
-                console.log(
-                    "Google email:",
-                    user.email
-                );
-
 
                 // ========================================
                 // CHECK TALKIE TALKIE PROFILE
@@ -106,121 +97,59 @@ if (!googleSignupButton) {
 
 
                 // ========================================
-                // EXISTING USER
+                // EXISTING TALKIE TALKIE ACCOUNT
                 // ========================================
 
                 if (userDoc.exists()) {
 
                     console.log(
-                        "Existing Talkie Talkie user."
+                        "Existing Talkie Talkie account detected."
                     );
+
+
+                    // This is Signup page,
+                    // so do NOT log the user into Dashboard.
+
+                    await signOut(auth);
+
 
                     alert(
-                        "Login successful!"
+                        "This Google account already has a Talkie Talkie account. Please go to the Login page to log in."
                     );
 
+
                     window.location.href =
-                        "/dashboard.html";
+                        "/login.html";
+
 
                     return;
                 }
 
 
                 // ========================================
-                // CREATE NEW GOOGLE USER PROFILE
+                // NEW GOOGLE USER
                 // ========================================
 
-                const googleName =
-                    user.displayName ||
-                    "TalkieTalkie User";
+                console.log(
+                    "No Talkie Talkie account found."
+                );
 
 
-                const googleEmail =
-                    user.email ||
-                    "";
-
-
-                // ========================================
-                // AUTOMATIC USERNAME
-                // ========================================
-                // The user no longer needs to type
-                // a username.
+                // Do NOT create a Firestore profile.
+                // Do NOT redirect to Dashboard.
                 //
-                // We create one automatically using
-                // the Google name + part of Firebase UID.
-                // ========================================
+                // Sign out immediately so the Google
+                // authentication does not remain active.
 
-                let username =
-                    googleName
-                        .toLowerCase()
-                        .replace(/[^a-z0-9]/g, "")
-                        .substring(0, 20);
+                await signOut(auth);
 
-
-                if (!username) {
-                    username = "user";
-                }
-
-
-                username =
-                    username +
-                    "_" +
-                    user.uid.substring(0, 6);
-
-
-                console.log(
-                    "Generated username:",
-                    username
-                );
-
-
-                // ========================================
-                // SAVE USER PROFILE
-                // ========================================
-
-                await setDoc(
-                    userRef,
-                    {
-                        uid: user.uid,
-
-                        fullName: googleName,
-
-                        username: username,
-
-                        email: googleEmail,
-
-                        // These fields are no longer
-                        // collected during signup.
-                        age: null,
-
-                        gender: null,
-
-                        country: null,
-
-                        authProvider: "google",
-
-                        createdAt:
-                            new Date().toISOString()
-                    }
-                );
-
-
-                console.log(
-                    "New Google user profile saved to Firestore."
-                );
-
-
-                // ========================================
-                // SUCCESS
-                // ========================================
 
                 alert(
-                    "Account created successfully!"
+                    "You need to create a Talkie Talkie account to use Talkie Talkie."
                 );
 
 
-                window.location.href =
-                    "/dashboard.html";
+                // Stay on Signup page.
 
 
             } catch (error) {
@@ -251,7 +180,7 @@ if (!googleSignupButton) {
                 ) {
 
                     alert(
-                        "An account already exists with this email. Please use your existing login method."
+                        "An account already exists with this Google email. Please go to the Login page."
                     );
 
 
@@ -281,14 +210,14 @@ if (!googleSignupButton) {
                 ) {
 
                     alert(
-                        "Google account connected, but Talkie Talkie could not save your profile."
+                        "Talkie Talkie could not check your account. Please try again."
                     );
 
 
                 } else {
 
                     alert(
-                        "Google sign-up failed: " +
+                        "Google signup failed: " +
                         error.message
                     );
                 }
