@@ -11,8 +11,12 @@ const WebSocket = require('ws');
 
 
 const { initializeApp, cert } = require('firebase-admin/app');
-const { getFirestore } = require('firebase-admin/firestore');
+const {
+  getFirestore,
+  FieldValue
+} = require('firebase-admin/firestore');
 const { getAuth } = require('firebase-admin/auth');
+const admin = require('firebase-admin');
 const privateKey = process.env.FIREBASE_PRIVATE_KEY
   ?.replace(/^"|"$/g, '')
   .replace(/\\n/g, '\n')
@@ -640,7 +644,7 @@ app.post('/api/coupons/create-order', async (req, res) => {
 
         status: 'created',
 
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
+        createdAt: FieldValue.serverTimestamp()
       });
 
     console.log(
@@ -845,7 +849,7 @@ app.post('/api/coupons/verify-payment', async (req, res) => {
               used: true,
               usedBy: uid,
               usedAt:
-                admin.firestore.FieldValue.serverTimestamp(),
+              FieldValue.serverTimestamp(),
               razorpayOrderId:
                 razorpay_order_id,
               razorpayPaymentId:
@@ -863,7 +867,7 @@ app.post('/api/coupons/verify-payment', async (req, res) => {
               razorpaySignature:
                 razorpay_signature,
               verifiedAt:
-                admin.firestore.FieldValue.serverTimestamp()
+                FieldValue.serverTimestamp()
             }
           );
 
@@ -903,7 +907,7 @@ app.post('/api/coupons/verify-payment', async (req, res) => {
                 'paid',
 
               createdAt:
-                admin.firestore.FieldValue.serverTimestamp()
+                FieldValue.serverTimestamp()
             }
           );
 
