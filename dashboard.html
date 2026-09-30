@@ -1057,7 +1057,7 @@ const handleCouponPayment = async () => {
     // --------------------------------------------------------
 
     const response = await fetch(
-      "http://localhost:5000/api/coupons/create-order",
+      "https://talkie-talkie-server.onrender.com/api/coupons/create-order",
       {
         method: "POST",
 
@@ -1128,7 +1128,7 @@ const handleCouponPayment = async () => {
 
           const verifyResponse =
             await fetch(
-              "http://localhost:5000/api/coupons/verify-payment",
+              "https://talkie-talkie-server.onrender.com/api/coupons/verify-payment",
               {
                 method: "POST",
 
