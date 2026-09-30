@@ -253,6 +253,123 @@ app.post('/api/support/ticket', async (req, res) => {
 // RAZORPAY PAYMENT ROUTES
 // ============================================================
 
+// ============================================================
+// COUPON VALIDATION ROUTE
+// ============================================================
+
+// Validate a TalkieTalkie coupon
+app.post('/api/coupons/validate', async (req, res) => {
+  try {
+    // Verify Firebase login
+    const decodedToken = await verifyFirebaseToken(req);
+    const uid = decodedToken.uid;
+
+    // Get coupon code from request
+    const rawCode = req.body.code || '';
+    const code = rawCode.trim().toUpperCase();
+
+    if (!code) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter a coupon code.'
+      });
+    }
+
+    // Find coupon in Firestore
+    const couponRef = firestore
+      .collection('coupons')
+      .doc(code);
+
+    const couponSnap = await couponRef.get();
+
+    // Coupon does not exist
+    if (!couponSnap.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invalid coupon code.'
+      });
+    }
+
+    const coupon = couponSnap.data();
+
+    // Check coupon status
+    if (coupon.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        message: 'This coupon is not active.'
+      });
+    }
+
+    // Check whether coupon was already used
+    if (coupon.used === true) {
+      return res.status(400).json({
+        success: false,
+        message: 'This coupon has already been used.'
+      });
+    }
+
+    // Allowed access types
+    const allowedAccessTypes = [
+      'family_unlimited',
+      'business_unlimited',
+      'both_unlimited'
+    ];
+
+    if (!allowedAccessTypes.includes(coupon.accessType)) {
+      console.error(
+        `Invalid coupon access type | Code: ${code} | Access: ${coupon.accessType}`
+      );
+
+      return res.status(400).json({
+        success: false,
+        message: 'This coupon has an invalid access type.'
+      });
+    }
+
+    console.log(
+      `Coupon validated | Code: ${code} | UID: ${uid} | Access: ${coupon.accessType}`
+    );
+
+    // IMPORTANT:
+    // Validation does NOT consume the coupon.
+    // The coupon will only be marked as used
+    // after successful payment in a later step.
+
+    return res.status(200).json({
+      success: true,
+      coupon: {
+        code: code,
+        accessType: coupon.accessType
+      },
+      message: 'Coupon is valid.'
+    });
+
+  } catch (error) {
+
+    console.error(
+      'Coupon validation error:',
+      error
+    );
+
+    if (
+      error.message === 'NO_TOKEN' ||
+      error.code === 'auth/id-token-expired' ||
+      error.code === 'auth/argument-error' ||
+      error.code === 'auth/invalid-id-token'
+    ) {
+      return res.status(401).json({
+        success: false,
+        message: 'Please log in again before using a coupon.'
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to validate coupon.'
+    });
+  }
+});
+
 // Create a Razorpay order
 app.post('/api/payment/create-order', async (req, res) => {
   try {
