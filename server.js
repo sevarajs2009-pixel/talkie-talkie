@@ -502,8 +502,504 @@ app.post('/api/payment/create-order', async (req, res) => {
     });
   }
 });
+// ============================================================
+// COUPON PAYMENT ORDER ROUTE
+// ============================================================
+
+// Create a Razorpay payment order for a validated coupon
+app.post('/api/coupons/create-order', async (req, res) => {
+  try {
+    // Verify Firebase login
+    const decodedToken = await verifyFirebaseToken(req);
+    const uid = decodedToken.uid;
+
+    // Razorpay must be configured
+    if (!razorpay) {
+      return res.status(500).json({
+        success: false,
+        message: 'Payment service is not configured.'
+      });
+    }
+
+    // Get coupon code
+    const rawCode = req.body.code || '';
+    const code = rawCode.trim().toUpperCase();
+
+    if (!code) {
+      return res.status(400).json({
+        success: false,
+        message: 'Coupon code is required.'
+      });
+    }
+
+    // Get coupon directly from Firestore
+    const couponRef = firestore
+      .collection('coupons')
+      .doc(code);
+
+    const couponSnap = await couponRef.get();
+
+    if (!couponSnap.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invalid coupon code.'
+      });
+    }
+
+    const coupon = couponSnap.data();
+
+    // Coupon must still be active
+    if (coupon.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        message: 'This coupon is not active.'
+      });
+    }
+
+    // Coupon must still be unused
+    if (coupon.used === true) {
+      return res.status(400).json({
+        success: false,
+        message: 'This coupon has already been used.'
+      });
+    }
+
+    // Validate project information
+    if (
+      !coupon.projectName ||
+      !coupon.projectDescription
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'This coupon is missing project information.'
+      });
+    }
+
+    // Validate amount
+    if (
+      typeof coupon.amount !== 'number' ||
+      coupon.amount <= 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'This coupon has an invalid payment amount.'
+      });
+    }
+
+    // Validate currency
+    if (!coupon.currency) {
+      return res.status(400).json({
+        success: false,
+        message: 'This coupon is missing currency information.'
+      });
+    }
+
+    // Razorpay currently expects the amount
+    // in the smallest currency unit.
+    let razorpayAmount;
+
+    if (coupon.currency === 'INR') {
+      razorpayAmount = Math.round(coupon.amount * 100);
+    } else if (coupon.currency === 'USD') {
+      razorpayAmount = Math.round(coupon.amount * 100);
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: `Unsupported coupon currency: ${coupon.currency}`
+      });
+    }
+
+    // Create Razorpay order
+    const order = await razorpay.orders.create({
+      amount: razorpayAmount,
+      currency: coupon.currency,
+      receipt: `coupon_${code}_${Date.now()}`,
+      notes: {
+        couponCode: code,
+        uid: uid,
+        projectName: coupon.projectName
+      }
+    });
+
+    // Save payment order information
+    await firestore
+      .collection('couponPaymentOrders')
+      .doc(order.id)
+      .set({
+        orderId: order.id,
+        uid: uid,
+        couponCode: code,
+
+        projectName: coupon.projectName,
+        projectDescription: coupon.projectDescription,
+
+        amount: coupon.amount,
+        currency: coupon.currency,
+
+        razorpayAmount: razorpayAmount,
+
+        status: 'created',
+
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+    console.log(
+      `Coupon payment order created | Order: ${order.id} | Coupon: ${code} | UID: ${uid} | Amount: ${coupon.amount} ${coupon.currency}`
+    );
+
+    return res.status(200).json({
+      success: true,
+
+      order: {
+  id: order.id,
+  amount: razorpayAmount,
+  currency: coupon.currency,
+  keyId: razorpayKeyId
+},
+
+      coupon: {
+        code: code,
+        projectName: coupon.projectName,
+        projectDescription: coupon.projectDescription,
+        amount: coupon.amount,
+        currency: coupon.currency
+      }
+    });
+
+  } catch (error) {
+
+    console.error(
+      'Coupon payment order creation error:',
+      error
+    );
+
+    if (
+      error.message === 'NO_TOKEN' ||
+      error.code === 'auth/id-token-expired' ||
+      error.code === 'auth/argument-error' ||
+      error.code === 'auth/invalid-id-token'
+    ) {
+      return res.status(401).json({
+        success: false,
+        message: 'Please log in again before making payment.'
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to create coupon payment order.'
+    });
+  }
+});
 
 
+
+// ============================================================
+// COUPON PAYMENT VERIFICATION ROUTE
+// ============================================================
+
+// Verify a coupon Razorpay payment and consume the coupon
+app.post('/api/coupons/verify-payment', async (req, res) => {
+  try {
+    // Verify Firebase login
+    const decodedToken = await verifyFirebaseToken(req);
+    const uid = decodedToken.uid;
+
+    // Razorpay must be configured
+    if (!razorpay) {
+      return res.status(500).json({
+        success: false,
+        message: 'Payment service is not configured.'
+      });
+    }
+
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature
+    } = req.body;
+
+    if (
+      !razorpay_order_id ||
+      !razorpay_payment_id ||
+      !razorpay_signature
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Incomplete payment verification data.'
+      });
+    }
+
+    // Get the coupon payment order
+    const paymentOrderRef = firestore
+      .collection('couponPaymentOrders')
+      .doc(razorpay_order_id);
+
+    const paymentOrderSnap =
+      await paymentOrderRef.get();
+
+    if (!paymentOrderSnap.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Coupon payment order not found.'
+      });
+    }
+
+    const paymentOrder =
+      paymentOrderSnap.data();
+
+    // Make sure this order belongs to the logged-in user
+    if (paymentOrder.uid !== uid) {
+      return res.status(403).json({
+        success: false,
+        message: 'This payment order does not belong to your account.'
+      });
+    }
+
+    // Prevent duplicate processing
+    if (paymentOrder.status === 'paid') {
+      return res.status(200).json({
+        success: true,
+        alreadyProcessed: true,
+        message: 'This payment has already been processed.'
+      });
+    }
+
+    // Verify Razorpay signature
+    const generatedSignature =
+      crypto
+        .createHmac('sha256', razorpayKeySecret)
+        .update(
+          `${razorpay_order_id}|${razorpay_payment_id}`
+        )
+        .digest('hex');
+
+    if (
+      generatedSignature !==
+      razorpay_signature
+    ) {
+      console.error(
+        `Invalid coupon payment signature | Order: ${razorpay_order_id} | UID: ${uid}`
+      );
+
+      return res.status(400).json({
+        success: false,
+        message: 'Payment verification failed.'
+      });
+    }
+
+    // Get the coupon
+    const couponCode =
+      paymentOrder.couponCode;
+
+    if (!couponCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Coupon information is missing from this payment.'
+      });
+    }
+
+    const couponRef =
+      firestore
+        .collection('coupons')
+        .doc(couponCode);
+
+    // --------------------------------------------------------
+    // ATOMIC TRANSACTION
+    // --------------------------------------------------------
+
+    const result =
+      await firestore.runTransaction(
+        async (transaction) => {
+
+          const couponSnap =
+            await transaction.get(couponRef);
+
+          if (!couponSnap.exists) {
+            throw new Error(
+              'COUPON_NOT_FOUND'
+            );
+          }
+
+          const coupon =
+            couponSnap.data();
+
+          // Coupon must still be unused
+          if (coupon.used === true) {
+            throw new Error(
+              'COUPON_ALREADY_USED'
+            );
+          }
+
+          // Coupon must still be active
+          if (coupon.status !== 'active') {
+            throw new Error(
+              'COUPON_NOT_ACTIVE'
+            );
+          }
+
+          // Mark coupon as used
+          transaction.update(
+            couponRef,
+            {
+              used: true,
+              usedBy: uid,
+              usedAt:
+                admin.firestore.FieldValue.serverTimestamp(),
+              razorpayOrderId:
+                razorpay_order_id,
+              razorpayPaymentId:
+                razorpay_payment_id
+            }
+          );
+
+          // Mark payment order as paid
+          transaction.update(
+            paymentOrderRef,
+            {
+              status: 'paid',
+              razorpayPaymentId:
+                razorpay_payment_id,
+              razorpaySignature:
+                razorpay_signature,
+              verifiedAt:
+                admin.firestore.FieldValue.serverTimestamp()
+            }
+          );
+
+          // Save customer payment/project record
+          const paymentRef =
+            firestore
+              .collection('users')
+              .doc(uid)
+              .collection('couponPayments')
+              .doc(razorpay_payment_id);
+
+          transaction.set(
+            paymentRef,
+            {
+              paymentId:
+                razorpay_payment_id,
+
+              orderId:
+                razorpay_order_id,
+
+              couponCode:
+                couponCode,
+
+              projectName:
+                paymentOrder.projectName,
+
+              projectDescription:
+                paymentOrder.projectDescription,
+
+              amount:
+                paymentOrder.amount,
+
+              currency:
+                paymentOrder.currency,
+
+              status:
+                'paid',
+
+              createdAt:
+                admin.firestore.FieldValue.serverTimestamp()
+            }
+          );
+
+          return {
+            projectName:
+              paymentOrder.projectName,
+
+            amount:
+              paymentOrder.amount,
+
+            currency:
+              paymentOrder.currency
+          };
+        }
+      );
+
+    console.log(
+      `Coupon payment verified and coupon consumed | Coupon: ${couponCode} | Order: ${razorpay_order_id} | Payment: ${razorpay_payment_id} | UID: ${uid}`
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'Payment verified successfully.',
+      payment: {
+        paymentId:
+          razorpay_payment_id,
+
+        orderId:
+          razorpay_order_id,
+
+        couponCode:
+          couponCode,
+
+        projectName:
+          result.projectName,
+
+        amount:
+          result.amount,
+
+        currency:
+          result.currency
+      }
+    });
+
+  } catch (error) {
+
+    console.error(
+      'Coupon payment verification error:',
+      error
+    );
+
+    if (
+      error.message === 'COUPON_NOT_FOUND'
+    ) {
+      return res.status(404).json({
+        success: false,
+        message: 'Coupon not found.'
+      });
+    }
+
+    if (
+      error.message === 'COUPON_ALREADY_USED'
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'This coupon has already been used.'
+      });
+    }
+
+    if (
+      error.message === 'COUPON_NOT_ACTIVE'
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'This coupon is not active.'
+      });
+    }
+
+    if (
+      error.message === 'NO_TOKEN' ||
+      error.code === 'auth/id-token-expired' ||
+      error.code === 'auth/argument-error' ||
+      error.code === 'auth/invalid-id-token'
+    ) {
+      return res.status(401).json({
+        success: false,
+        message: 'Please log in again before verifying payment.'
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to verify coupon payment.'
+    });
+  }
+});
 // Verify Razorpay payment
 app.post('/api/payment/verify', async (req, res) => {
   console.log('>>> PAYMENT VERIFY ROUTE CALLED');
