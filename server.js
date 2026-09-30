@@ -291,6 +291,10 @@ app.post('/api/coupons/validate', async (req, res) => {
     }
 
     const coupon = couponSnap.data();
+    console.log(
+  'Coupon data from Firestore:',
+  coupon
+);
 
     // Check coupon status
     if (coupon.status !== 'active') {
@@ -308,39 +312,68 @@ app.post('/api/coupons/validate', async (req, res) => {
       });
     }
 
-    // Allowed access types
-    const allowedAccessTypes = [
-      'family_unlimited',
-      'business_unlimited',
-      'both_unlimited'
-    ];
-
-    if (!allowedAccessTypes.includes(coupon.accessType)) {
+    // Check required project information
+    if (
+      !coupon.projectName ||
+      !coupon.projectDescription
+    ) {
       console.error(
-        `Invalid coupon access type | Code: ${code} | Access: ${coupon.accessType}`
+        `Coupon missing project information | Code: ${code}`
       );
 
       return res.status(400).json({
         success: false,
-        message: 'This coupon has an invalid access type.'
+        message: 'This coupon is missing project information.'
+      });
+    }
+
+    // Check amount
+    if (
+      typeof coupon.amount !== 'number' ||
+      coupon.amount <= 0
+    ) {
+      console.error(
+        `Coupon has invalid amount | Code: ${code} | Amount: ${coupon.amount}`
+      );
+
+      return res.status(400).json({
+        success: false,
+        message: 'This coupon has an invalid payment amount.'
+      });
+    }
+
+    // Check currency
+    if (!coupon.currency) {
+      console.error(
+        `Coupon missing currency | Code: ${code}`
+      );
+
+      return res.status(400).json({
+        success: false,
+        message: 'This coupon is missing currency information.'
       });
     }
 
     console.log(
-      `Coupon validated | Code: ${code} | UID: ${uid} | Access: ${coupon.accessType}`
+      `Coupon validated | Code: ${code} | UID: ${uid} | Project: ${coupon.projectName} | Amount: ${coupon.amount} ${coupon.currency}`
     );
 
     // IMPORTANT:
     // Validation does NOT consume the coupon.
     // The coupon will only be marked as used
-    // after successful payment in a later step.
+    // after successful payment verification.
 
     return res.status(200).json({
       success: true,
+
       coupon: {
         code: code,
-        accessType: coupon.accessType
+        projectName: coupon.projectName,
+        projectDescription: coupon.projectDescription,
+        amount: coupon.amount,
+        currency: coupon.currency
       },
+
       message: 'Coupon is valid.'
     });
 

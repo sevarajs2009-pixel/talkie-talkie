@@ -1006,8 +1006,8 @@ const handleGuestJoin = async (e) => {
     setDiscountApplied(false);
 
     setCouponStatus(
-      `Coupon valid! Access: ${result.coupon.accessType}`
-    );
+  `Coupon valid! Project: ${result.coupon.projectName} | Amount: ${result.coupon.amount} ${result.coupon.currency}`
+);
 
   } catch (error) {
     console.error("Coupon validation error:", error);
