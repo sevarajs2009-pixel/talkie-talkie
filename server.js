@@ -431,8 +431,9 @@ app.post('/api/payment/create-order', async (req, res) => {
     // Change this amount when your final pricing is decided.
     const plans = {
   // EXISTING PLAN â€” DO NOT CHANGE
+   // EXISTING PLAN — ₹100 INR
   extra_room_india: {
-    amount: 8000, // â‚¹80 = 8000 paise
+    amount: 10000, // ₹100 = 10000 paise
     currency: 'INR',
     name: 'TalkieTalkie Extra Room - India'
   },
